@@ -14,7 +14,7 @@ const envSchema = z.object({
   REDIS_HOST: z.string().default('redis'),
   REDIS_PORT: z.coerce.number().default(6378),
 
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().default('http://localhost:5000'),
 
   PAYMENT_PUBLIC_KEY: z.string(),
   PAYMENT_PRIVATE_KEY: z.string(),

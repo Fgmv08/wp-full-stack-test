@@ -14,7 +14,7 @@ async function bootstrap(): Promise<void> {
 
     // 3. Start HTTP server
     const app = buildApp();
-    app.listen(env.PORT, () => {
+    app.listen(env.PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${env.PORT} [${env.NODE_ENV}]`);
     });
   } catch (error) {
