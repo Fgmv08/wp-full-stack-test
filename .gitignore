@@ -1,0 +1,21 @@
+# Entornos y secretos
+.env
+app/.env
+server/.env
+
+# Dependencias y build
+node_modules
+app/node_modules
+server/node_modules
+app/dist
+server/dist
+
+# Logs y SO
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
