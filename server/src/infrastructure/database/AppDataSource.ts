@@ -12,7 +12,7 @@ export const AppDataSource = new DataSource({
   username: env.POSTGRES_USER,
   password: env.POSTGRES_PASSWORD,
   database: env.POSTGRES_DB,
-  synchronize: env.NODE_ENV === 'development', // auto-sync in dev
+  synchronize: env.NODE_ENV === 'development' || process.env.TYPEORM_SYNCHRONIZE === 'true', // auto-sync in dev or when explicitly enabled
   logging: env.NODE_ENV === 'development',
   entities: [UserEntity, ProductEntity, OrderEntity],
   migrations: ['dist/infrastructure/database/migrations/*.js'],

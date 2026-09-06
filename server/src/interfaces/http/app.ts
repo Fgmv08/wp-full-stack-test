@@ -5,6 +5,7 @@ import { env } from '@shared/config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { createProductRoutes } from './routes/products.routes';
 import { createCartRoutes } from './routes/cart.routes';
+import { createOrderRoutes } from './routes/orders.routes';
 import { createPaymentRoutes } from './routes/payment.routes';
 import { AppDataSource } from '@infrastructure/database/AppDataSource';
 import { PostgresUserRepository } from '@infrastructure/database/repositories/PostgresUserRepository';
@@ -41,7 +42,14 @@ export function buildApp() {
 
   app.use('/api/products', createProductRoutes(productRepo));
   app.use('/api/cart', createCartRoutes(userRepo, orderRepo));
+  app.use('/api/orders', createOrderRoutes(orderRepo));
   app.use('/api/payment', paymentRouter);
+
+  // Alias /api/datapayment to paymentRouter's /datapayment handler
+  app.post('/api/datapayment', (req, res, next) => {
+    req.url = '/datapayment';
+    paymentRouter(req, res, next);
+  });
 
   // ── 404 Handler ──────────────────────────────────────────────────────────────
   app.use((_req, res) => {
