@@ -1,0 +1,23 @@
+# Exported from Render on 2026-09-06T17:56:37Z
+version: "1"
+projects:
+- name: My project
+  environments:
+  - name: Production
+    services:
+    - type: web
+      name: shopstore
+      runtime: docker
+      repo: https://github.com/Fgmv08/wp-full-stack-test
+      branch: master
+      plan: free
+      envVars:
+      - key: VITE_PAYMENT_PUBLIC_KEY
+        sync: false
+      - key: VITE_API_URL
+        sync: false
+      region: oregon
+      dockerContext: .
+      dockerfilePath: /
+      autoDeployTrigger: commit
+      rootDir: app
