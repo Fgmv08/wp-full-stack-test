@@ -12,6 +12,10 @@
     "migration:generate": "npm run typeorm -- migration:generate -d src/infrastructure/database/AppDataSource.ts",
     "seed": "ts-node -r tsconfig-paths/register src/infrastructure/database/seed.ts"
   },
+  "_moduleAliases": {
+    "@infrastructure": "dist/infrastructure",
+    "@interfaces": "dist/interfaces"
+  },
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
