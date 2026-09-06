@@ -20,10 +20,13 @@ export const AppDataSource = new DataSource({
   ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
+import { runAutoSeed } from './seeders/autoSeeder';
+
 export async function initializeDatabase(): Promise<void> {
   try {
     await AppDataSource.initialize();
     console.log('✅ Database connected');
+    await runAutoSeed();
   } catch (error) {
     console.error('❌ Database connection failed:', error);
     throw error;
