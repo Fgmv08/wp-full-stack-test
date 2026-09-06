@@ -3,12 +3,12 @@ import { UserEntity } from '../entities/UserEntity';
 import { ProductEntity } from '../entities/ProductEntity';
 
 const DEFAULT_USER = {
-  firstName: 'Carlos',
-  lastName: 'Mendoza',
-  email: 'carlos.mendoza@techshop.co',
-  phone: '+573001234567',
+  firstName: 'Frank',
+  lastName: 'Muriel',
+  email: 'frank.muriel@techshop.co',
+  phone: '+573042030331',
   idType: 'CC',
-  idNumber: '1023456789',
+  idNumber: '1011590183',
 };
 
 const DEFAULT_PRODUCTS = [
@@ -77,14 +77,6 @@ const DEFAULT_PRODUCTS = [
     category: 'componentes',
   },
   {
-    name: 'Hub USB-C 7 en 1 Anker',
-    description: 'Hub multipuerto con HDMI 4K, 2x USB-A 3.0, USB-C PD 100W, lector SD/microSD y puerto Ethernet Gigabit.',
-    priceCents: 19900000, // $199.000 COP
-    stock: 45,
-    imageUrl: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=500&auto=format&fit=crop',
-    category: 'accesorios',
-  },
-  {
     name: 'Webcam Logitech C922 Pro 1080p',
     description: 'Cámara web Full HD 1080p/30fps y 720p/60fps con enfoque automático y corrección de iluminación por IA.',
     priceCents: 29900000, // $299.000 COP
@@ -99,15 +91,7 @@ const DEFAULT_PRODUCTS = [
     stock: 20,
     imageUrl: 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=500&auto=format&fit=crop',
     category: 'perifericos',
-  },
-  {
-    name: 'Monitor Portátil AOC 15.6" 144Hz',
-    description: 'Monitor IPS portátil Full HD 144Hz con conexión USB-C, compatible con laptops, consolas y smartphones.',
-    priceCents: 79900000, // $799.000 COP
-    stock: 12,
-    imageUrl: 'https://images.unsplash.com/photo-1527443224154-c4a573d5f5f9?w=500&auto=format&fit=crop',
-    category: 'monitores',
-  },
+  },  
   {
     name: 'Cargador Rápido Anker GaN 65W',
     description: 'Cargador de pared compacto con tecnología GaN, 2 puertos USB-C y 1 puerto USB-A. Carga rápida para laptop y smartphone.',

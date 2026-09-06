@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/store';
 import {
   closeCheckout,
@@ -6,7 +6,6 @@ import {
   updateDeliveryInfo,
   updateCardInfo,
   setExpiryInput,
-  setInstallments,
   requestDataPayment,
 } from '../redux/slices/checkoutSlice';
 import {
@@ -19,6 +18,7 @@ import {
 } from '@/shared/utils/cardUtils';
 import { COLOMBIA_DEPARTMENTS } from '@/shared/data/colombiaData';
 import { SearchableSelect } from './SearchableSelect';
+import { WompiWidgetButton } from './WompiWidgetButton';
 
 export const CheckoutModal: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -29,7 +29,6 @@ export const CheckoutModal: React.FC = () => {
     deliveryInfo,
     cardInfo,
     expiryInput,
-    installments,
     loading,
     error,
     dataPaymentResult,
@@ -132,32 +131,7 @@ export const CheckoutModal: React.FC = () => {
     if (validateDelivery()) {
       const actionResult = await dispatch(requestDataPayment());
       if (requestDataPayment.fulfilled.match(actionResult)) {
-        const data = actionResult.payload;
-
-        // Trigger Wompi WidgetCheckout if available
-        if (typeof (window as any).WidgetCheckout !== 'undefined') {
-          try {
-            const checkout = new (window as any).WidgetCheckout({
-              currency: data.currency,
-              amountInCents: data.amountInCents,
-              reference: data.reference,
-              publicKey: data.publicKey,
-              signature: { integrity: data.signature.integrity },
-              redirectUrl: data.redirectUrl,
-              customerData: data.customerData,
-              shippingAddress: data.shippingAddress,
-            });
-
-            checkout.open((res: any) => {
-              console.log('Resultado del widget Wompi:', res);
-              if (res && res.transaction && res.transaction.id) {
-                window.location.href = `/payment-result?id=${res.transaction.id}&reference=${data.reference}`;
-              }
-            });
-          } catch (err) {
-            console.error('Error abriendo WidgetCheckout:', err);
-          }
-        }
+        dispatch(setStep('CONFIRMATION'));
       }
     }
   };
@@ -175,20 +149,19 @@ export const CheckoutModal: React.FC = () => {
       );
       dispatch(setExpiryInput('12/30'));
     } else {
-      const formatted = formatCardNumber('4000000000000002');
+      const formatted = formatCardNumber('5306200221224312');
       dispatch(
         updateCardInfo({
           number: formatted,
           cvc: '123',
           cardHolder: 'MARIA GOMEZ (RECHAZADA)',
-          brand: 'VISA',
+          brand: 'MASTERCARD',
         })
       );
       dispatch(setExpiryInput('12/30'));
     }
     setFormErrors({});
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
       <div className="relative w-full max-w-xl sm:max-w-2xl max-h-[92vh] flex flex-col glass-modal rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-700/80 overflow-hidden my-auto">
@@ -202,9 +175,13 @@ export const CheckoutModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
-                {step === 'CARD_DETAILS' ? '1. Datos de Tarjeta' : '2. Datos de Envío'}
+                {step === 'CARD_DETAILS'
+                  ? '1. Datos de Tarjeta Débito'
+                  : step === 'DELIVERY_INFO'
+                  ? '2. Datos de Envío'
+                  : '3. Resumen y Pago Wompi'}
               </h3>
-              <p className="text-xs text-slate-400">Onboarding de pago seguro con Wompi</p>
+              <p className="text-xs text-slate-400">Onboarding de pago seguro con Wompi (Sandbox)</p>
             </div>
           </div>
 
@@ -231,9 +208,9 @@ export const CheckoutModal: React.FC = () => {
                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
               }`}
             >
-              {step === 'DELIVERY_INFO' ? '✓' : '1'}
+              {step !== 'CARD_DETAILS' ? '✓' : '1'}
             </span>
-            <span className="text-xs font-semibold text-slate-300">Tarjeta de Crédito</span>
+            <span className="text-xs font-semibold text-slate-300">Tarjeta Débito</span>
           </div>
 
           <div className="w-8 sm:w-16 h-0.5 bg-slate-800"></div>
@@ -243,10 +220,12 @@ export const CheckoutModal: React.FC = () => {
               className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                 step === 'DELIVERY_INFO'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
+                  : step === 'CONFIRMATION'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                   : 'bg-slate-800 text-slate-500'
               }`}
             >
-              2
+              {step === 'CONFIRMATION' ? '✓' : '2'}
             </span>
             <span className="text-xs font-semibold text-slate-300">Datos de Envío</span>
           </div>
@@ -254,10 +233,16 @@ export const CheckoutModal: React.FC = () => {
           <div className="w-8 sm:w-16 h-0.5 bg-slate-800"></div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-slate-800 text-slate-500">
+            <span
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                step === 'CONFIRMATION'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
+                  : 'bg-slate-800 text-slate-500'
+              }`}
+            >
               3
             </span>
-            <span className="text-xs font-semibold text-slate-400">Wompi Widget</span>
+            <span className="text-xs font-semibold text-slate-300">Pagar con Wompi</span>
           </div>
         </div>
 
@@ -296,14 +281,14 @@ export const CheckoutModal: React.FC = () => {
             <form onSubmit={handleCardNext} className="space-y-4">
               {/* Quick Fill Test Cards */}
               <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs">
-                <span className="text-slate-400 font-medium">Pruebas Sandbox:</span>
+                <span className="text-slate-400 font-medium">Pruebas Sandbox (Débito):</span>
                 <div className="flex space-x-2">
                   <button
                     type="button"
                     onClick={() => fillTestCard('APPROVED')}
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition font-semibold"
                   >
-                    ⚡ Visa Aprobada
+                    ⚡ Visa Débito Aprobada
                   </button>
                   <button
                     type="button"
@@ -318,7 +303,7 @@ export const CheckoutModal: React.FC = () => {
               {/* Card Number Input with Brand Logo Detection */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-300">Número de Tarjeta</label>
+                  <label className="block text-xs font-semibold text-slate-300">Número de Tarjeta Débito</label>
                   {/* Brand Badge */}
                   <div className="flex items-center space-x-1.5">
                     {cardBrand === 'VISA' && (
@@ -385,8 +370,8 @@ export const CheckoutModal: React.FC = () => {
                 {formErrors.cardHolder && <p className="text-xs text-rose-400 mt-1">{formErrors.cardHolder}</p>}
               </div>
 
-              {/* Combined Expiry MM/YY and CVC and Installments in Responsive Flex */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Combined Expiry MM/YY and CVC (Sin selector de cuotas, por defecto débito 1 pago) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* Single Combined Expiry Input MM/YY */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -431,22 +416,18 @@ export const CheckoutModal: React.FC = () => {
                   />
                   {formErrors.cvc && <p className="text-xs text-rose-400 mt-1">{formErrors.cvc}</p>}
                 </div>
+              </div>
 
-                {/* Installments Selector */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Cuotas</label>
-                  <select
-                    value={installments}
-                    onChange={(e) => dispatch(setInstallments(Number(e.target.value)))}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 focus:border-indigo-500 text-sm text-slate-100 focus:outline-none transition"
-                  >
-                    {Array.from({ length: 36 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n} {n === 1 ? 'cuota' : 'cuotas'}
-                      </option>
-                    ))}
-                  </select>
+              {/* Informative notice: Débito en 1 pago sin cuotas */}
+              <div className="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
+                <span>
+                  <strong>Modalidad Débito:</strong> El pago se efectúa directamente en 1 sola cuota contra los fondos disponibles de tu cuenta bancaria.
+                </span>
               </div>
 
               {/* Actions */}
@@ -607,7 +588,7 @@ export const CheckoutModal: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <span>Continuar al Pago con Wompi</span>
+                      <span>Revisar Resumen y Pagar</span>
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                       </svg>
@@ -615,23 +596,113 @@ export const CheckoutModal: React.FC = () => {
                   )}
                 </button>
               </div>
+            </form>
+          )}
 
-              {/* Info about Wompi Checkout script */}
-              {dataPaymentResult && (
-                <div className="mt-4 p-4 rounded-2xl bg-slate-900 border border-indigo-500/30 text-xs space-y-2">
-                  <div className="flex items-center justify-between text-indigo-300 font-bold">
-                    <span>✓ Firma Wompi Generada Exitosamente</span>
-                    <span className="font-mono text-[10px] text-slate-400">SHA-256</span>
+          {/* ═══════════════════════════════════════════════════════════════
+              STEP 3: RESUMEN DE TRANSACCIÓN Y BOTÓN OFICIAL WOMPI
+             ═══════════════════════════════════════════════════════════════ */}
+          {step === 'CONFIRMATION' && dataPaymentResult && (
+            <div className="space-y-5">
+              {/* Cost breakdown summary */}
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="text-xs font-bold text-slate-200">Resumen de la Transacción</span>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-semibold">
+                    Tarifa Oficial
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-xs text-slate-300">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Tarifa base producto:</span>
+                    <span>{formattedPrice}</span>
                   </div>
-                  <p className="text-slate-400">
-                    Referencia única: <span className="font-mono text-white font-bold">{dataPaymentResult.reference}</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Costo de entrega:</span>
+                    <span>$ 8.000 COP</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Tarifa base administrativa:</span>
+                    <span>$ 5.000 COP</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-slate-800 font-bold text-sm text-white">
+                    <span>Total a Pagar:</span>
+                    <span className="text-indigo-400">
+                      {new Intl.NumberFormat('es-CO', {
+                        style: 'currency',
+                        currency: 'COP',
+                        maximumFractionDigits: 0,
+                      }).format(dataPaymentResult.amountInCents / 100)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery & Payment details summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+                  <span className="font-bold text-slate-300 block">Datos de Entrega</span>
+                  <p className="text-slate-400 truncate">
+                    {deliveryInfo.recipientName} ({deliveryInfo.recipientPhone})
                   </p>
-                  <p className="text-slate-500 break-all font-mono text-[11px]">
-                    Firma: {dataPaymentResult.signature.integrity}
+                  <p className="text-slate-400 truncate">
+                    {deliveryInfo.address}, {deliveryInfo.city} - {deliveryInfo.department}
                   </p>
                 </div>
-              )}
-            </form>
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+                  <span className="font-bold text-slate-300 block">Método de Pago</span>
+                  <p className="text-slate-400 flex items-center space-x-1">
+                    <span>Tarjeta Débito:</span>
+                    <span className="font-mono text-white">
+                      •••• {cardInfo.number.replace(/\s+/g, '').slice(-4) || '4242'}
+                    </span>
+                  </p>
+                  <p className="text-slate-400 truncate">Titular: {cardInfo.cardHolder}</p>
+                </div>
+              </div>
+
+              {/* Integrity and Reference Info */}
+              <div className="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-indigo-300 font-semibold">Referencia de Pago:</span>
+                  <span className="font-mono font-bold text-white text-[11px]">{dataPaymentResult.reference}</span>
+                </div>
+                <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Firma Integridad Wompi:</span>
+                  <span className="font-mono text-slate-300 truncate max-w-[200px]" title={dataPaymentResult.signature.integrity}>
+                    {dataPaymentResult.signature.integrity.substring(0, 16)}...
+                  </span>
+                </div>
+              </div>
+
+              {/* Official Wompi Widget Button rendered dynamically */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col items-center justify-center space-y-3">
+                <span className="text-xs text-slate-300 font-semibold">
+                  Haz clic en el botón oficial de Wompi para abrir la pasarela:
+                </span>
+                <WompiWidgetButton
+                  publicKey={dataPaymentResult.publicKey}
+                  currency={dataPaymentResult.currency}
+                  amountInCents={dataPaymentResult.amountInCents}
+                  reference={dataPaymentResult.reference}
+                  signatureIntegrity={dataPaymentResult.signature.integrity}
+                  redirectUrl={dataPaymentResult.redirectUrl}
+                  customerData={dataPaymentResult.customerData}
+                  shippingAddress={dataPaymentResult.shippingAddress}
+                />
+              </div>
+
+              {/* Back to Delivery Details button */}
+              <div className="pt-2 flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => dispatch(setStep('DELIVERY_INFO'))}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                >
+                  ← Volver a Datos de Envío
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

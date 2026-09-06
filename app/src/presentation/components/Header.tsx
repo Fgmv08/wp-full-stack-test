@@ -21,7 +21,7 @@ export const Header: React.FC = () => {
             </svg>
           </div>
           <div className="truncate">
-            <span className="font-black text-lg sm:text-xl tracking-tight gradient-text">Wompi Store</span>
+            <span className="font-black text-lg sm:text-xl tracking-tight gradient-text">Shop Store</span>
             <span className="hidden sm:inline-block ml-2 text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
               Fullstack Jr Test
             </span>

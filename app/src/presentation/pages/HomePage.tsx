@@ -61,7 +61,7 @@ export const HomePage: React.FC = () => {
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-800/80 py-6 text-center text-xs text-slate-500 bg-slate-950">
-        <p>© 2026 Wompi Store — Solución Prueba Técnica Fullstack Jr</p>
+        <p>© 2026 Shop Store — Solución Prueba Técnica Fullstack Jr</p>
       </footer>
     </div>
   )

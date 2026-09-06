@@ -42,7 +42,6 @@ export function buildApp() {
   app.use('/api/products', createProductRoutes(productRepo));
   app.use('/api/cart', createCartRoutes(userRepo, orderRepo));
   app.use('/api/payment', paymentRouter);
-  app.use('/api', paymentRouter); // Mounts /api/datapayment and /api/orders directly
 
   // ── 404 Handler ──────────────────────────────────────────────────────────────
   app.use((_req, res) => {
