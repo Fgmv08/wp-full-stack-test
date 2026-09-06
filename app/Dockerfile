@@ -1,6 +1,6 @@
 FROM node:22-alpine AS development
 
-WORKDIR /appl
+WORKDIR /app
 
 RUN apk add --no-cache libc6-compat
 
@@ -21,6 +21,12 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+ARG VITE_API_URL
+ARG VITE_PAYMENT_PUBLIC_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_PAYMENT_PUBLIC_KEY=$VITE_PAYMENT_PUBLIC_KEY
+
 RUN npm run build
 
 FROM nginx:1.27-alpine AS production
