@@ -16,7 +16,12 @@ export function buildApp() {
   const app = express();
 
   // ── Middlewares ──────────────────────────────────────────────────────────────
-  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  app.use(
+    cors({
+      origin: env.NODE_ENV === 'development' ? true : env.CORS_ORIGIN,
+      credentials: true,
+    }),
+  );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
