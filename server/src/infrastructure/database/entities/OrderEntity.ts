@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import type { OrderStatus, DeliveryInfo } from '@domain/entities/Order';
+import type { OrderStatus, DeliveryInfo, CardSummary } from '@domain/entities/Order';
 
 @Entity('orders')
 export class OrderEntity {
@@ -25,6 +25,9 @@ export class OrderEntity {
   })
   status!: OrderStatus;
 
+  @Column({ name: 'reference', type: 'varchar', nullable: true })
+  reference!: string | null;
+
   @Column({ name: 'wompi_transaction_id', type: 'varchar', nullable: true })
   wompiTransactionId!: string | null;
 
@@ -39,6 +42,9 @@ export class OrderEntity {
 
   @Column({ name: 'delivery_info', type: 'jsonb', nullable: true })
   deliveryInfo!: DeliveryInfo | null;
+
+  @Column({ name: 'card_info', type: 'jsonb', nullable: true })
+  cardInfo!: CardSummary | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

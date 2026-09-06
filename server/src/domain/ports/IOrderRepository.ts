@@ -1,4 +1,4 @@
-import type { Order, OrderStatus, DeliveryInfo } from '../entities/Order';
+import type { Order, OrderStatus, DeliveryInfo, CardSummary } from '../entities/Order';
 
 export interface CreateOrderInput {
   userId: string;
@@ -7,11 +7,15 @@ export interface CreateOrderInput {
   baseFeeCents: number;
   shippingFeeCents: number;
   deliveryInfo: DeliveryInfo;
+  reference?: string | null;
+  cardInfo?: CardSummary | null;
 }
 
 export interface IOrderRepository {
+  findAll(): Promise<Order[]>;
   findByUserId(userId: string): Promise<Order | null>;
   findById(id: string): Promise<Order | null>;
+  findByReference(reference: string): Promise<Order | null>;
   findByWompiTransactionId(wompiTxId: string): Promise<Order | null>;
   create(input: CreateOrderInput): Promise<Order>;
   updateStatus(id: string, status: OrderStatus, wompiTxId?: string): Promise<Order>;

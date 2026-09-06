@@ -5,6 +5,7 @@ export interface Order {
   userId: string
   productIds: string[]
   status: OrderStatus
+  reference?: string | null
   wompiTransactionId: string | null
   totalAmountCents: number
   baseFeeCents: number
@@ -17,6 +18,11 @@ export interface Order {
     recipientName: string
     recipientPhone: string
   }
+  cardInfo?: {
+    brand: string
+    lastFour: string
+    cardHolder: string
+  } | null
   createdAt: string
   updatedAt: string
 }
@@ -34,4 +40,5 @@ export interface CardInfo {
   expMonth: string
   expYear: string
   cardHolder: string
+  brand?: string
 }

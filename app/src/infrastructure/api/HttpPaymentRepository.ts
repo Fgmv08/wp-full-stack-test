@@ -1,6 +1,12 @@
 import { apiClient } from './apiClient'
-import type { IPaymentRepository, CreateOrderInput, CreateOrderResult, TransactionResult } from '@/domain/ports/IPaymentRepository'
-import type { PaymentConfig } from '@/domain/entities/Order'
+import type {
+  IPaymentRepository,
+  CreateOrderInput,
+  CreateOrderResult,
+  TransactionResult,
+  DataPaymentResult,
+} from '@/domain/ports/IPaymentRepository'
+import type { PaymentConfig, Order } from '@/domain/entities/Order'
 
 interface ApiResponse<T> {
   success: boolean
@@ -10,6 +16,16 @@ interface ApiResponse<T> {
 export class HttpPaymentRepository implements IPaymentRepository {
   async getConfig(): Promise<PaymentConfig> {
     const { data } = await apiClient.get<ApiResponse<PaymentConfig>>('/payment/config')
+    return data.data
+  }
+
+  async getDataPayment(input: CreateOrderInput): Promise<DataPaymentResult> {
+    const { data } = await apiClient.post<ApiResponse<DataPaymentResult>>('/datapayment', input)
+    return data.data
+  }
+
+  async getOrders(): Promise<Order[]> {
+    const { data } = await apiClient.get<ApiResponse<Order[]>>('/orders')
     return data.data
   }
 

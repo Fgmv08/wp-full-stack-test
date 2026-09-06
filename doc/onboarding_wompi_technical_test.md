@@ -10,40 +10,52 @@ El proyecto sigue **Arquitectura Hexagonal (Puertos y Adaptadores)** y **Princip
 
 ### 1. Backend (`server/`)
 - **Dominio (`src/domain`)**:
-  - Entidades: `Product`, `User`, `Order`.
+  - Entidades: `Product`, `User`, `Order` (con `reference` y `cardInfo`).
   - Puertos: `IProductRepository`, `IUserRepository`, `IOrderRepository`, `IPaymentGateway`.
-- **Aplicación (`src/application`)**: Casos de uso desacoplados (`GetProducts`, `GetProductById`, `CreateOrder`, `ConfirmPayment`, `GetTransaction`, `GetPaymentConfig`).
+- **Aplicación (`src/application`)**: Casos de uso desacoplados (`GetProducts`, `GetProductById`, `GenerateDataPayment`, `GetOrders`, `ConfirmPayment`, `GetTransaction`, `GetPaymentConfig`).
 - **Infraestructura (`src/infrastructure`)**:
-  - `database`: PostgreSQL 16 con **TypeORM v0.3.20** y pool de conexiones.
-  - `cache`: Redis 7 con `ioredis` para caché de productos y resiliencia.
-  - `payment`: Adaptador Wompi sandbox (`WompiAdapter`) que se comunica directamente con la API de Wompi v1 para tokenización e integridad de firma SHA-256.
+  - `database`: PostgreSQL 16 con **TypeORM v0.3.20**, auto-migraciones y **AutoSeeder** (valida si la base de datos está vacía e inserta 15 productos con stock y usuario por defecto).
+  - `cache`: Redis 7 con `ioredis` para caché y resiliencia.
+  - `payment`: Adaptador Wompi sandbox (`WompiAdapter`) y generación de firma SHA-256 con secreto de integridad.
 - **Interfaces (`src/interfaces`)**:
-  - HTTP REST endpoints construidos con Express.js + Zod validation + middleware de errores centralizado.
+  - HTTP REST endpoints con Express.js + Zod validation + middleware de errores centralizado.
 
 ### 2. Frontend (`app/`)
 - **Dominio y Puertos (`src/domain`)**: Definición de interfaces de entidades (`Product`, `Cart`, `Order`) y repositorios (`IProductRepository`, `IPaymentRepository`).
 - **Infraestructura (`src/infrastructure`)**: Cliente HTTP Axios (`HttpProductRepository`, `HttpPaymentRepository`).
 - **Presentación y Estado (`src/presentation`)**:
-  - **Redux Toolkit (Patrón Flux)**: `productSlice`, `checkoutSlice`, `transactionSlice`.
-  - Componentes UI: `Header`, `ProductCard`, `ProductGrid`, `CheckoutModal` (Modal multi-paso con tarjetas de prueba sandbox).
-  - Páginas: `HomePage` (Catálogo de productos) y `PaymentResultPage` (Componente de verificación de transacción y retorno de ID de usuario).
+  - **Redux Toolkit (Patrón Flux)**: `productSlice`, `checkoutSlice`, `transactionSlice`, `orderSlice`.
+  - **Diseño Responsivo con Flexbox**: Adaptable a resoluciones compactas (desde 1334px x 750px) y dispositivos móviles.
+  - **Componente de Pedidos del Sistema**: Visualización en tiempo real de órdenes con badge superior y modal detallado (`OrdersSummaryModal`).
+  - **Modal de Checkout Optimizado**:
+    - **Paso 1 (Tarjeta de Crédito)**: Algoritmo de Luhn, detección automática de Visa y Mastercard con logotipos oficiales, campo único de vencimiento `MM/YY`, CVC y selector de cuotas.
+    - **Paso 2 (Datos de Envío & Cliente)**: Datos del sistema precargados (`Carlos Mendoza`), dropdowns con búsqueda en tiempo real de Departamentos de Colombia y Ciudades filtradas por departamento.
+    - **Paso 3 (Wompi WidgetCheckout)**: Invocación oficial del widget de Wompi mediante firma SHA-256 de integridad generada por el backend.
 
 ---
 
 ## 🔄 Flujo del Proceso Comercial Wompi
 
-1. **Selección del Producto**: El cliente explora la tienda, donde ve la descripción, precio en COP y el stock disponible.
-2. **Formulario de Entrega**: Al presionar "Pagar", se abre el modal donde ingresa sus datos personales y dirección de despacho (nombre destinatario, teléfono, dirección, ciudad, departamento, código postal).
-3. **Formulario de Pago & Tokenización**: Se capturan los datos de la tarjeta (Número, CVC, MM/YY, Titular, Cuotas).
-4. **Procesamiento de Orden & Reserva**:
-   - Se crea/recupera el usuario comprador.
-   - Se tokeniza la tarjeta de forma segura con Wompi (`POST /v1/tokens/cards`).
-   - Se genera la orden en estado `PENDING` en PostgreSQL.
-   - Se efectúa la transacción en Wompi sandbox (`POST /v1/transactions`) firmada con SHA-256 (`PAYMENT_INTEGRITY_KEY`).
-5. **Resultado y Retorno de ID de Usuario**:
-   - La respuesta o redirección dirige al componente `PaymentResultPage` (`/payment-result?transactionId=...&userId=...`).
-   - Se consulta el backend (`GET /api/payment/transaction/:wompiTxId`) para verificar la transacción en Wompi y base de datos.
-   - Si la transacción fue aprobada, se descuenta la unidad del inventario y se retorna el **ID del Usuario** comprador para consulta inmediata.
+1. **Selección del Producto**: El cliente explora la tienda con 15 productos iniciales con stock y precios en COP.
+2. **Formulario de Tarjeta**:
+   - Detección visual instantánea de franquicia (Visa / Mastercard).
+   - Validación del número de tarjeta mediante el algoritmo de Luhn (módulo 10).
+   - Captura de fecha de vencimiento combinada (`MM/YY`), CVC y titular.
+3. **Formulario de Entrega**:
+   - Datos personales y de contacto precargados del usuario del sistema.
+   - Dropdown interactivo tipeable para seleccionar Departamento de Colombia y Ciudad correspondiente.
+4. **Generación de Datos de Pago & Firma (`/api/datapayment`)**:
+   - El backend genera una referencia única de pago (`REF_...`).
+   - Calcula la firma de integridad SHA-256:
+     `sha256(<referencia><montoEnCentavos><moneda><secretoIntegridad>)`
+   - Registra el pedido en estado `PENDING` en PostgreSQL con los datos del comprador y tarjeta enmascarada.
+5. **Apertura de Wompi Widget**:
+   - Se instancia `WidgetCheckout` con la firma y parámetros retornados.
+   - El cliente concluye la transacción en la interfaz segura de Wompi.
+6. **Confirmación y Actualización de Stock**:
+   - Wompi redirecciona a `/payment-result?id=...&reference=...`.
+   - El backend valida el estado de la transacción con Wompi (`/api/payment/confirm`).
+   - Al aprobarse, se actualiza la orden a `APPROVED` y se descuenta automáticamente el inventario en la base de datos.
 
 ---
 
@@ -54,23 +66,24 @@ El proyecto sigue **Arquitectura Hexagonal (Puertos y Adaptadores)** y **Princip
 - `GET /api/products/:id`: Obtiene el detalle de un producto específico.
 
 ### Pagos y Órdenes
+- `POST /api/datapayment`: Genera la referencia de pago, calcula la firma SHA-256 de integridad de Wompi, registra la orden en `PENDING` y devuelve la configuración para el `WidgetCheckout`.
+- `GET /api/orders`: Lista todos los pedidos registrados en el sistema para el componente de consulta superior.
 - `GET /api/payment/config`: Retorna la llave pública de Wompi sandbox.
-- `POST /api/payment/create-order`: Recibe los datos de producto, tarjeta y envío; procesa el pago y crea la orden.
-- `POST /api/payment/confirm`: Confirma y actualiza el estado de una transacción Wompi y actualiza el stock si aplica.
-- `GET /api/payment/transaction/:wompiTxId`: Retorna los detalles de la orden y la transacción dado el ID de transacción Wompi y el **ID de usuario**.
+- `POST /api/payment/create-order`: Procesa pago directo con tokenización.
+- `POST /api/payment/confirm`: Confirma el estado de una transacción Wompi y actualiza el stock si fue aprobada.
+- `GET /api/payment/transaction/:wompiTxId`: Retorna el detalle de una transacción y su orden asociada.
 
 ---
 
 ## 🐳 Despliegue con Docker y `.env_file`
 
-Cada subcarpeta tiene su propio archivo `.env` independiente:
-- `server/.env`: Variables del backend (credenciales DB, Redis, llaves Wompi).
-- `app/.env`: Variables del frontend (`VITE_API_URL`, `VITE_PAYMENT_PUBLIC_KEY`).
+- `server/.env`: Configuración de base de datos, Redis y credenciales sandbox de Wompi.
+- `app/.env`: Variables del cliente frontend (`VITE_API_URL`, `VITE_PAYMENT_PUBLIC_KEY`).
 
 ### Comandos de Ejecución con `docker-compose.yml`:
 
 ```bash
-# Levantar todos los servicios (Postgres, Redis, Server backend, App frontend)
+# Levantar todos los servicios
 docker-compose up --build -d
 
 # Ver logs de los servicios
@@ -80,23 +93,8 @@ docker-compose logs -f
 docker-compose down
 ```
 
-Las aplicaciones quedarán expuestas en:
+### Puertos Expuestos:
 - **Frontend App**: `http://localhost:5000`
 - **Backend API**: `http://localhost:8080`
-
-Dado caso este en local la apirest de Wompi se deja: `https://sandbox.wompi.co/api`.
-
-
-
-
----
-
-## 📋 Lista de Verificación Manual (Checklist)
-
-- [x] Carga de productos desde el backend con estado de stock.
-- [x] Modal de Checkout multi-paso (Datos de Envío -> Tarjeta Wompi -> Procesamiento -> Resultado).
-- [x] Presets de prueba de tarjeta Wompi (Aprobada `4242...` y Rechazada `4000...`).
-- [x] Validación de campos del formulario con Zod / React state.
-- [x] Redirección / Vista de resultado en `/payment-result` mostrando el **ID del Usuario** comprador.
-- [x] Actualización automática de stock en base de datos al aprobar la transacción.
-- [x] Archivos `Dockerfile` independientes y unificados en `docker-compose.yml`.
+- **PostgreSQL**: `localhost:5432`
+- **Redis**: `localhost:6378` (interno `6379`)

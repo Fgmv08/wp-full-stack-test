@@ -3,11 +3,11 @@ import type { Product } from '@/domain/entities/Product'
 import type { DeliveryInfo } from '@/domain/entities/Cart'
 import type { CardInfo, Order } from '@/domain/entities/Order'
 import { HttpPaymentRepository } from '@/infrastructure/api/HttpPaymentRepository'
-import type { CreateOrderResult } from '@/domain/ports/IPaymentRepository'
+import type { CreateOrderResult, DataPaymentResult } from '@/domain/ports/IPaymentRepository'
 
 const paymentRepo = new HttpPaymentRepository()
 
-export type CheckoutStep = 'DELIVERY_INFO' | 'CARD_DETAILS' | 'PROCESSING' | 'CONFIRMATION'
+export type CheckoutStep = 'CARD_DETAILS' | 'DELIVERY_INFO' | 'PROCESSING' | 'CONFIRMATION'
 
 interface CheckoutState {
   isOpen: boolean
@@ -15,53 +15,58 @@ interface CheckoutState {
   product: Product | null
   deliveryInfo: DeliveryInfo
   cardInfo: CardInfo
+  expiryInput: string // combined MM/YY
   installments: number
   loading: boolean
   error: string | null
   orderResult: CreateOrderResult | null
+  dataPaymentResult: DataPaymentResult | null
 }
 
-const initialDeliveryInfo: DeliveryInfo = {
-  address: '',
-  city: '',
-  department: '',
-  postalCode: '',
-  recipientName: '',
-  recipientPhone: '',
+const defaultDeliveryInfo: DeliveryInfo = {
+  recipientName: 'Carlos Mendoza',
+  recipientPhone: '3001234567',
+  address: 'Calle 100 # 15-20 Apt 501',
+  city: 'Bogotá',
+  department: 'Cundinamarca',
+  postalCode: '110111',
 }
 
-const initialCardInfo: CardInfo = {
+const defaultCardInfo: CardInfo = {
   number: '',
   cvc: '',
   expMonth: '',
   expYear: '',
-  cardHolder: '',
+  cardHolder: 'CARLOS MENDOZA',
+  brand: 'UNKNOWN',
 }
 
 const initialState: CheckoutState = {
   isOpen: false,
-  step: 'DELIVERY_INFO',
+  step: 'CARD_DETAILS',
   product: null,
-  deliveryInfo: initialDeliveryInfo,
-  cardInfo: initialCardInfo,
+  deliveryInfo: defaultDeliveryInfo,
+  cardInfo: defaultCardInfo,
+  expiryInput: '',
   installments: 1,
   loading: false,
   error: null,
   orderResult: null,
+  dataPaymentResult: null,
 }
 
-export const processPayment = createAsyncThunk(
-  'checkout/processPayment',
+export const requestDataPayment = createAsyncThunk(
+  'checkout/requestDataPayment',
   async (_, { getState, rejectWithValue }) => {
     try {
       const state = (getState() as any).checkout as CheckoutState
       if (!state.product) {
-        throw new Error('No product selected for payment')
+        throw new Error('No hay un producto seleccionado')
       }
 
       const redirectUrl = `${window.location.origin}/payment-result`
 
-      const result = await paymentRepo.createOrder({
+      const result = await paymentRepo.getDataPayment({
         productId: state.product.id,
         card: state.cardInfo,
         deliveryInfo: state.deliveryInfo,
@@ -71,7 +76,9 @@ export const processPayment = createAsyncThunk(
 
       return result
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.error?.message || err.message || 'Payment processing failed')
+      return rejectWithValue(
+        err.response?.data?.error?.message || err.message || 'Error al preparar los datos de pago con Wompi'
+      )
     }
   }
 )
@@ -83,9 +90,10 @@ const checkoutSlice = createSlice({
     openCheckout: (state, action: PayloadAction<Product>) => {
       state.isOpen = true
       state.product = action.payload
-      state.step = 'DELIVERY_INFO'
+      state.step = 'CARD_DETAILS' // Step 1 is now Credit Card
       state.error = null
       state.orderResult = null
+      state.dataPaymentResult = null
     },
     closeCheckout: (state) => {
       state.isOpen = false
@@ -100,6 +108,16 @@ const checkoutSlice = createSlice({
     updateCardInfo: (state, action: PayloadAction<Partial<CardInfo>>) => {
       state.cardInfo = { ...state.cardInfo, ...action.payload }
     },
+    setExpiryInput: (state, action: PayloadAction<string>) => {
+      state.expiryInput = action.payload
+      const clean = action.payload.replace(/\D/g, '')
+      if (clean.length >= 2) {
+        state.cardInfo.expMonth = clean.slice(0, 2)
+      }
+      if (clean.length >= 4) {
+        state.cardInfo.expYear = clean.slice(2, 4)
+      }
+    },
     setInstallments: (state, action: PayloadAction<number>) => {
       state.installments = action.payload
     },
@@ -107,20 +125,17 @@ const checkoutSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(processPayment.pending, (state) => {
+      .addCase(requestDataPayment.pending, (state) => {
         state.loading = true
-        state.step = 'PROCESSING'
         state.error = null
       })
-      .addCase(processPayment.fulfilled, (state, action: PayloadAction<CreateOrderResult>) => {
+      .addCase(requestDataPayment.fulfilled, (state, action: PayloadAction<DataPaymentResult>) => {
         state.loading = false
-        state.orderResult = action.payload
-        state.step = 'CONFIRMATION'
+        state.dataPaymentResult = action.payload
       })
-      .addCase(processPayment.rejected, (state, action) => {
+      .addCase(requestDataPayment.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
-        state.step = 'CARD_DETAILS'
       })
   },
 })
@@ -131,6 +146,7 @@ export const {
   setStep,
   updateDeliveryInfo,
   updateCardInfo,
+  setExpiryInput,
   setInstallments,
   resetCheckout,
 } = checkoutSlice.actions

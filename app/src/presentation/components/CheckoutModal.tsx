@@ -1,514 +1,640 @@
-import React, { useState } from 'react'
-import { useAppDispatch, useAppSelector } from '../redux/store'
+import React, { useState, useMemo } from 'react';
+import { useAppDispatch, useAppSelector } from '../redux/store';
 import {
   closeCheckout,
   setStep,
   updateDeliveryInfo,
   updateCardInfo,
+  setExpiryInput,
   setInstallments,
-  processPayment,
-  resetCheckout,
-} from '../redux/slices/checkoutSlice'
+  requestDataPayment,
+} from '../redux/slices/checkoutSlice';
+import {
+  validateLuhn,
+  detectCardBrand,
+  formatCardNumber,
+  formatExpiry,
+  validateExpiry,
+  type CardBrand,
+} from '@/shared/utils/cardUtils';
+import { COLOMBIA_DEPARTMENTS } from '@/shared/data/colombiaData';
+import { SearchableSelect } from './SearchableSelect';
 
 export const CheckoutModal: React.FC = () => {
-  const dispatch = useAppDispatch()
-  const { isOpen, step, product, deliveryInfo, cardInfo, installments, loading, error, orderResult } =
-    useAppSelector((state) => state.checkout)
+  const dispatch = useAppDispatch();
+  const {
+    isOpen,
+    step,
+    product,
+    deliveryInfo,
+    cardInfo,
+    expiryInput,
+    installments,
+    loading,
+    error,
+    dataPaymentResult,
+  } = useAppSelector((state) => state.checkout);
 
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  if (!isOpen || !product) return null
+  // Departments list
+  const departmentsList = useMemo(
+    () => COLOMBIA_DEPARTMENTS.map((d) => d.department),
+    []
+  );
+
+  // Cities for selected department
+  const citiesList = useMemo(() => {
+    const found = COLOMBIA_DEPARTMENTS.find(
+      (d) => d.department.toLowerCase() === (deliveryInfo.department || '').toLowerCase()
+    );
+    return found ? found.cities : [];
+  }, [deliveryInfo.department]);
+
+  // Detected brand
+  const cardBrand: CardBrand = useMemo(() => {
+    return detectCardBrand(cardInfo.number);
+  }, [cardInfo.number]);
+
+  if (!isOpen || !product) return null;
 
   const formattedPrice = new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
     maximumFractionDigits: 0,
-  }).format(product.priceCents / 100)
+  }).format(product.priceCents / 100);
 
-  // Validation logic
-  const validateDelivery = () => {
-    const errors: Record<string, string> = {}
-    if (!deliveryInfo.recipientName || deliveryInfo.recipientName.length < 3) {
-      errors.recipientName = 'Nombre completo requerido (mín. 3 letras)'
-    }
-    if (!deliveryInfo.recipientPhone || deliveryInfo.recipientPhone.length < 7) {
-      errors.recipientPhone = 'Teléfono válido requerido'
-    }
-    if (!deliveryInfo.address || deliveryInfo.address.length < 5) {
-      errors.address = 'Dirección completa requerida'
-    }
-    if (!deliveryInfo.city) errors.city = 'Ciudad requerida'
-    if (!deliveryInfo.department) errors.department = 'Departamento requerido'
-    if (!deliveryInfo.postalCode) errors.postalCode = 'Código postal requerido'
+  // ── Step 1 Validation (Card Details) ──────────────────────────
+  const validateCard = (): boolean => {
+    const errors: Record<string, string> = {};
+    const cleanNum = cardInfo.number.replace(/\s+/g, '');
 
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const validateCard = () => {
-    const errors: Record<string, string> = {}
-    const cleanNum = cardInfo.number.replace(/\s+/g, '')
     if (!cleanNum || cleanNum.length < 13 || cleanNum.length > 19) {
-      errors.number = 'Número de tarjeta inválido (13-19 dígitos)'
-    }
-    if (!cardInfo.cvc || cardInfo.cvc.length < 3) {
-      errors.cvc = 'CVC de 3 o 4 dígitos'
-    }
-    if (!cardInfo.expMonth || cardInfo.expMonth.length !== 2) {
-      errors.expMonth = 'Mes en formato MM'
-    }
-    if (!cardInfo.expYear || cardInfo.expYear.length !== 2) {
-      errors.expYear = 'Año en formato YY'
-    }
-    if (!cardInfo.cardHolder || cardInfo.cardHolder.length < 3) {
-      errors.cardHolder = 'Nombre del titular de la tarjeta requerido'
+      errors.number = 'Número de tarjeta inválido (13 a 19 dígitos)';
+    } else if (!validateLuhn(cleanNum)) {
+      errors.number = 'Número de tarjeta inválido según algoritmo Luhn';
     }
 
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+    if (!cardInfo.cardHolder || cardInfo.cardHolder.trim().length < 3) {
+      errors.cardHolder = 'Nombre del titular requerido';
+    }
 
-  const handleNextStep = () => {
-    if (step === 'DELIVERY_INFO') {
-      if (validateDelivery()) {
-        dispatch(setStep('CARD_DETAILS'))
+    if (!expiryInput || !validateExpiry(expiryInput)) {
+      errors.expiry = 'Fecha de expiración inválida (Formato MM/YY)';
+    }
+
+    if (!cardInfo.cvc || cardInfo.cvc.length < 3 || cardInfo.cvc.length > 4) {
+      errors.cvc = 'CVC de 3 o 4 dígitos';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // ── Step 2 Validation (Delivery Details) ───────────────────────
+  const validateDelivery = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!deliveryInfo.recipientName || deliveryInfo.recipientName.trim().length < 3) {
+      errors.recipientName = 'Nombre completo requerido';
+    }
+    if (!deliveryInfo.recipientPhone || deliveryInfo.recipientPhone.replace(/\D/g, '').length < 7) {
+      errors.recipientPhone = 'Teléfono de contacto requerido';
+    }
+    if (!deliveryInfo.address || deliveryInfo.address.trim().length < 5) {
+      errors.address = 'Dirección completa requerida';
+    }
+    if (!deliveryInfo.department) {
+      errors.department = 'Selecciona un departamento';
+    }
+    if (!deliveryInfo.city) {
+      errors.city = 'Selecciona una ciudad';
+    }
+    if (!deliveryInfo.postalCode || deliveryInfo.postalCode.trim().length < 4) {
+      errors.postalCode = 'Código postal requerido';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCardNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateCard()) {
+      dispatch(updateCardInfo({ brand: cardBrand }));
+      dispatch(setStep('DELIVERY_INFO'));
+      setFormErrors({});
+    }
+  };
+
+  const handleDeliverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateDelivery()) {
+      const actionResult = await dispatch(requestDataPayment());
+      if (requestDataPayment.fulfilled.match(actionResult)) {
+        const data = actionResult.payload;
+
+        // Trigger Wompi WidgetCheckout if available
+        if (typeof (window as any).WidgetCheckout !== 'undefined') {
+          try {
+            const checkout = new (window as any).WidgetCheckout({
+              currency: data.currency,
+              amountInCents: data.amountInCents,
+              reference: data.reference,
+              publicKey: data.publicKey,
+              signature: { integrity: data.signature.integrity },
+              redirectUrl: data.redirectUrl,
+              customerData: data.customerData,
+              shippingAddress: data.shippingAddress,
+            });
+
+            checkout.open((res: any) => {
+              console.log('Resultado del widget Wompi:', res);
+              if (res && res.transaction && res.transaction.id) {
+                window.location.href = `/payment-result?id=${res.transaction.id}&reference=${data.reference}`;
+              }
+            });
+          } catch (err) {
+            console.error('Error abriendo WidgetCheckout:', err);
+          }
+        }
       }
     }
-  }
-
-  const handleSubmitPayment = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (validateCard()) {
-      dispatch(processPayment())
-    }
-  }
+  };
 
   const fillTestCard = (type: 'APPROVED' | 'DECLINED') => {
     if (type === 'APPROVED') {
+      const formatted = formatCardNumber('4242424242424242');
       dispatch(
         updateCardInfo({
-          number: '4242424242424242',
+          number: formatted,
           cvc: '123',
-          expMonth: '12',
-          expYear: '30',
-          cardHolder: 'JUAN PEREZ (APROBADO)',
+          cardHolder: 'CARLOS MENDOZA (APROBADA)',
+          brand: 'VISA',
         })
-      )
+      );
+      dispatch(setExpiryInput('12/30'));
     } else {
+      const formatted = formatCardNumber('4000000000000002');
       dispatch(
         updateCardInfo({
-          number: '4000000000000002',
+          number: formatted,
           cvc: '123',
-          expMonth: '12',
-          expYear: '30',
-          cardHolder: 'MARIA LOPEZ (RECHAZADO)',
+          cardHolder: 'MARIA GOMEZ (RECHAZADA)',
+          brand: 'VISA',
         })
-      )
+      );
+      dispatch(setExpiryInput('12/30'));
     }
-  }
+    setFormErrors({});
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="glass-modal w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/60 relative my-8">
-        {/* Close Button */}
-        <button
-          onClick={() => dispatch(closeCheckout())}
-          disabled={loading}
-          className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* Steps indicator */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
-          <div className="flex items-center space-x-2">
-            <span
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === 'DELIVERY_INFO'
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-              }`}
-            >
-              1
-            </span>
-            <span className="text-sm font-semibold text-slate-300">Entrega</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-xl sm:max-w-2xl max-h-[92vh] flex flex-col glass-modal rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-700/80 overflow-hidden my-auto">
+        {/* ── Modal Header: Title & Close Button (Separated to avoid overlap) ── */}
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-800 bg-slate-900/60 flex-shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30 flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                {step === 'CARD_DETAILS' ? '1. Datos de Tarjeta' : '2. Datos de Envío'}
+              </h3>
+              <p className="text-xs text-slate-400">Onboarding de pago seguro con Wompi</p>
+            </div>
           </div>
 
-          <div className="w-8 h-0.5 bg-slate-800"></div>
+          {/* Close button with clear padding, never overlapping */}
+          <button
+            type="button"
+            onClick={() => dispatch(closeCheckout())}
+            disabled={loading}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* ── Steps Progress Indicator ── */}
+        <div className="px-4 sm:px-6 py-3 bg-slate-950/50 border-b border-slate-800/80 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center space-x-2">
+            <span
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                step === 'CARD_DETAILS'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+              }`}
+            >
+              {step === 'DELIVERY_INFO' ? '✓' : '1'}
+            </span>
+            <span className="text-xs font-semibold text-slate-300">Tarjeta de Crédito</span>
+          </div>
+
+          <div className="w-8 sm:w-16 h-0.5 bg-slate-800"></div>
 
           <div className="flex items-center space-x-2">
             <span
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === 'CARD_DETAILS'
-                  ? 'bg-indigo-500 text-white'
-                  : step === 'CONFIRMATION' || step === 'PROCESSING'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                step === 'DELIVERY_INFO'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
                   : 'bg-slate-800 text-slate-500'
               }`}
             >
               2
             </span>
-            <span className="text-sm font-semibold text-slate-300">Pago Wompi</span>
+            <span className="text-xs font-semibold text-slate-300">Datos de Envío</span>
           </div>
 
-          <div className="w-8 h-0.5 bg-slate-800"></div>
+          <div className="w-8 sm:w-16 h-0.5 bg-slate-800"></div>
 
           <div className="flex items-center space-x-2">
-            <span
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === 'CONFIRMATION'
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-800 text-slate-500'
-              }`}
-            >
+            <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-slate-800 text-slate-500">
               3
             </span>
-            <span className="text-sm font-semibold text-slate-300">Resultado</span>
+            <span className="text-xs font-semibold text-slate-400">Wompi Widget</span>
           </div>
         </div>
 
-        {/* Product summary header inside modal */}
-        <div className="flex items-center space-x-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800 mb-6">
-          <img src={product.imageUrl} alt={product.name} className="w-16 h-16 rounded-xl object-cover" />
-          <div className="flex-1">
-            <h4 className="font-bold text-slate-100">{product.name}</h4>
-            <p className="text-xs text-slate-400">Stock: {product.stock} unidades</p>
+        {/* ── Scrollable Body ── */}
+        <div className="p-4 sm:p-7 overflow-y-auto flex-1 space-y-5">
+          {/* Product Summary Banner */}
+          <div className="flex items-center space-x-3.5 p-3 sm:p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="w-14 h-14 rounded-xl object-cover bg-slate-950 flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-xs sm:text-sm text-slate-100 truncate">{product.name}</h4>
+              <p className="text-[11px] text-slate-400">Disponibles: {product.stock} unidades</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total</span>
+              <span className="text-base sm:text-lg font-black text-indigo-400">{formattedPrice}</span>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-xs text-slate-400 block">Total a pagar</span>
-            <span className="text-lg font-extrabold text-indigo-400">{formattedPrice}</span>
-          </div>
+
+          {error && (
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-2.5">
+              <svg className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              STEP 1: TARJETA DE CRÉDITO (Visa / Mastercard / Luhn / MM/YY)
+             ═══════════════════════════════════════════════════════════════ */}
+          {step === 'CARD_DETAILS' && (
+            <form onSubmit={handleCardNext} className="space-y-4">
+              {/* Quick Fill Test Cards */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs">
+                <span className="text-slate-400 font-medium">Pruebas Sandbox:</span>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => fillTestCard('APPROVED')}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition font-semibold"
+                  >
+                    ⚡ Visa Aprobada
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillTestCard('DECLINED')}
+                    className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition font-semibold"
+                  >
+                    ⚡ Rechazada
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Number Input with Brand Logo Detection */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">Número de Tarjeta</label>
+                  {/* Brand Badge */}
+                  <div className="flex items-center space-x-1.5">
+                    {cardBrand === 'VISA' && (
+                      <span className="flex items-center space-x-1 text-[11px] font-bold text-sky-400 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800">
+                        <svg className="w-5 h-3" viewBox="0 0 36 12" fill="currentColor">
+                          <path d="M14.5 1.5L12 11.5H9.5L12 1.5H14.5ZM24.5 1.8C24 1.6 23.2 1.4 22.2 1.4C19.7 1.4 17.9 2.7 17.9 4.6C17.9 6 19.2 6.8 20.2 7.3C21.2 7.8 21.6 8.1 21.6 8.6C21.6 9.3 20.7 9.7 19.8 9.7C18.6 9.7 17.9 9.5 17.1 9.1L16.7 8.9L16.3 11.3C17 11.6 18.3 11.9 19.6 11.9C22.3 11.9 24.1 10.6 24.1 8.5C24.1 7.2 23.2 6.2 21.7 5.5C20.8 5 20.3 4.7 20.3 4.2C20.3 3.7 20.9 3.2 22 3.2C22.9 3.2 23.6 3.4 24.1 3.6L24.5 1.8ZM31.4 1.5H29.5C28.8 1.5 28.3 1.7 28 2.3L23.9 11.5H26.5L27 10H30.1L30.4 11.5H32.7L31.4 1.5ZM27.8 8L29 4.6L29.7 8H27.8ZM7.5 1.5L5.1 8.3L4.8 6.9C4.3 5.3 3 3.6 1.4 2.8L3.6 11.5H6.2L10.1 1.5H7.5Z" />
+                        </svg>
+                        <span>VISA</span>
+                      </span>
+                    )}
+
+                    {cardBrand === 'MASTERCARD' && (
+                      <span className="flex items-center space-x-1 text-[11px] font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block -mr-1 opacity-90"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block opacity-90"></span>
+                        <span>MASTERCARD</span>
+                      </span>
+                    )}
+
+                    {cardBrand === 'UNKNOWN' && cardInfo.number.length > 0 && (
+                      <span className="text-[11px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                        Tarjeta
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <input
+                  type="text"
+                  maxLength={23}
+                  value={cardInfo.number}
+                  onChange={(e) => {
+                    const formatted = formatCardNumber(e.target.value);
+                    dispatch(updateCardInfo({ number: formatted }));
+                    if (formErrors.number) setFormErrors({ ...formErrors, number: '' });
+                  }}
+                  placeholder="4242  4242  4242  4242"
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition tracking-widest font-mono ${
+                    formErrors.number
+                      ? 'border-rose-500 focus:border-rose-400'
+                      : 'border-slate-800 focus:border-indigo-500'
+                  }`}
+                />
+                {formErrors.number && <p className="text-xs text-rose-400 mt-1">{formErrors.number}</p>}
+              </div>
+
+              {/* Cardholder Name */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre del Titular</label>
+                <input
+                  type="text"
+                  value={cardInfo.cardHolder}
+                  onChange={(e) => {
+                    dispatch(updateCardInfo({ cardHolder: e.target.value.toUpperCase() }));
+                    if (formErrors.cardHolder) setFormErrors({ ...formErrors, cardHolder: '' });
+                  }}
+                  placeholder="CARLOS MENDOZA"
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition uppercase tracking-wide ${
+                    formErrors.cardHolder
+                      ? 'border-rose-500 focus:border-rose-400'
+                      : 'border-slate-800 focus:border-indigo-500'
+                  }`}
+                />
+                {formErrors.cardHolder && <p className="text-xs text-rose-400 mt-1">{formErrors.cardHolder}</p>}
+              </div>
+
+              {/* Combined Expiry MM/YY and CVC and Installments in Responsive Flex */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Single Combined Expiry Input MM/YY */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Vencimiento (MM/YY)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={5}
+                    value={expiryInput}
+                    onChange={(e) => {
+                      const formatted = formatExpiry(e.target.value);
+                      dispatch(setExpiryInput(formatted));
+                      if (formErrors.expiry) setFormErrors({ ...formErrors, expiry: '' });
+                    }}
+                    placeholder="12/28"
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition text-center font-mono tracking-wider ${
+                      formErrors.expiry
+                        ? 'border-rose-500 focus:border-rose-400'
+                        : 'border-slate-800 focus:border-indigo-500'
+                    }`}
+                  />
+                  {formErrors.expiry && <p className="text-xs text-rose-400 mt-1">{formErrors.expiry}</p>}
+                </div>
+
+                {/* CVC / CVV */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">CVC / CVV</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={cardInfo.cvc}
+                    onChange={(e) => {
+                      dispatch(updateCardInfo({ cvc: e.target.value.replace(/\D/g, '') }));
+                      if (formErrors.cvc) setFormErrors({ ...formErrors, cvc: '' });
+                    }}
+                    placeholder="123"
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition text-center font-mono ${
+                      formErrors.cvc
+                        ? 'border-rose-500 focus:border-rose-400'
+                        : 'border-slate-800 focus:border-indigo-500'
+                    }`}
+                  />
+                  {formErrors.cvc && <p className="text-xs text-rose-400 mt-1">{formErrors.cvc}</p>}
+                </div>
+
+                {/* Installments Selector */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Cuotas</label>
+                  <select
+                    value={installments}
+                    onChange={(e) => dispatch(setInstallments(Number(e.target.value)))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 focus:border-indigo-500 text-sm text-slate-100 focus:outline-none transition"
+                  >
+                    {Array.from({ length: 36 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? 'cuota' : 'cuotas'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 flex justify-end">
+                <button
+                  type="submit"
+                  className="gradient-button w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-sm text-white shadow-lg flex items-center justify-center space-x-2"
+                >
+                  <span>Siguiente: Datos de Entrega</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              STEP 2: DATOS DE ENVÍO & CLIENTE (Pre-filled + Searchable selects)
+             ═══════════════════════════════════════════════════════════════ */}
+          {step === 'DELIVERY_INFO' && (
+            <form onSubmit={handleDeliverySubmit} className="space-y-4">
+              <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
+                <span>👤 Datos cargados por defecto del sistema (puedes editarlos)</span>
+                <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 font-mono">
+                  CC 1023456789
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo</label>
+                  <input
+                    type="text"
+                    value={deliveryInfo.recipientName}
+                    onChange={(e) => {
+                      dispatch(updateDeliveryInfo({ recipientName: e.target.value }));
+                      if (formErrors.recipientName) setFormErrors({ ...formErrors, recipientName: '' });
+                    }}
+                    placeholder="Carlos Mendoza"
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
+                      formErrors.recipientName ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                    }`}
+                  />
+                  {formErrors.recipientName && <p className="text-xs text-rose-400 mt-1">{formErrors.recipientName}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Teléfono</label>
+                  <input
+                    type="tel"
+                    value={deliveryInfo.recipientPhone}
+                    onChange={(e) => {
+                      dispatch(updateDeliveryInfo({ recipientPhone: e.target.value }));
+                      if (formErrors.recipientPhone) setFormErrors({ ...formErrors, recipientPhone: '' });
+                    }}
+                    placeholder="3001234567"
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
+                      formErrors.recipientPhone ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                    }`}
+                  />
+                  {formErrors.recipientPhone && <p className="text-xs text-rose-400 mt-1">{formErrors.recipientPhone}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Dirección de Entrega</label>
+                <input
+                  type="text"
+                  value={deliveryInfo.address}
+                  onChange={(e) => {
+                    dispatch(updateDeliveryInfo({ address: e.target.value }));
+                    if (formErrors.address) setFormErrors({ ...formErrors, address: '' });
+                  }}
+                  placeholder="Calle 100 # 15-20 Apt 501"
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
+                    formErrors.address ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                  }`}
+                />
+                {formErrors.address && <p className="text-xs text-rose-400 mt-1">{formErrors.address}</p>}
+              </div>
+
+              {/* Searchable Dropdowns for Departamento & Ciudad */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                {/* Departamento Searchable Select */}
+                <div>
+                  <SearchableSelect
+                    label="Departamento"
+                    value={deliveryInfo.department}
+                    options={departmentsList}
+                    placeholder="Buscar departamento..."
+                    error={formErrors.department}
+                    onChange={(dept) => {
+                      dispatch(updateDeliveryInfo({ department: dept, city: '' }));
+                      if (formErrors.department) setFormErrors({ ...formErrors, department: '' });
+                    }}
+                  />
+                </div>
+
+                {/* Ciudad Searchable Select (filtered by department) */}
+                <div>
+                  <SearchableSelect
+                    label="Ciudad"
+                    value={deliveryInfo.city}
+                    options={citiesList}
+                    placeholder={
+                      deliveryInfo.department
+                        ? 'Buscar ciudad...'
+                        : 'Elige departamento primero'
+                    }
+                    disabled={!deliveryInfo.department}
+                    error={formErrors.city}
+                    onChange={(cityName) => {
+                      dispatch(updateDeliveryInfo({ city: cityName }));
+                      if (formErrors.city) setFormErrors({ ...formErrors, city: '' });
+                    }}
+                  />
+                </div>
+
+                {/* Código Postal */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Código Postal</label>
+                  <input
+                    type="text"
+                    value={deliveryInfo.postalCode}
+                    onChange={(e) => {
+                      dispatch(updateDeliveryInfo({ postalCode: e.target.value }));
+                      if (formErrors.postalCode) setFormErrors({ ...formErrors, postalCode: '' });
+                    }}
+                    placeholder="110111"
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
+                      formErrors.postalCode ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                    }`}
+                  />
+                  {formErrors.postalCode && <p className="text-xs text-rose-400 mt-1">{formErrors.postalCode}</p>}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-4 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => dispatch(setStep('CARD_DETAILS'))}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
+                >
+                  ← Volver a Tarjeta
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="gradient-button w-full sm:w-auto px-7 py-3 rounded-xl font-bold text-sm text-white shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
+                      <span>Generando firma Wompi...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continuar al Pago con Wompi</span>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Info about Wompi Checkout script */}
+              {dataPaymentResult && (
+                <div className="mt-4 p-4 rounded-2xl bg-slate-900 border border-indigo-500/30 text-xs space-y-2">
+                  <div className="flex items-center justify-between text-indigo-300 font-bold">
+                    <span>✓ Firma Wompi Generada Exitosamente</span>
+                    <span className="font-mono text-[10px] text-slate-400">SHA-256</span>
+                  </div>
+                  <p className="text-slate-400">
+                    Referencia única: <span className="font-mono text-white font-bold">{dataPaymentResult.reference}</span>
+                  </p>
+                  <p className="text-slate-500 break-all font-mono text-[11px]">
+                    Firma: {dataPaymentResult.signature.integrity}
+                  </p>
+                </div>
+              )}
+            </form>
+          )}
         </div>
-
-        {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm mb-6 flex items-start space-x-3">
-            <svg className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* STEP 1: DELIVERY INFO */}
-        {step === 'DELIVERY_INFO' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-100 mb-4">Datos de Envío</h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Nombre Completo del Destinatario</label>
-                <input
-                  type="text"
-                  value={deliveryInfo.recipientName}
-                  onChange={(e) => dispatch(updateDeliveryInfo({ recipientName: e.target.value }))}
-                  placeholder="Ej: Juan Pérez"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-                />
-                {formErrors.recipientName && <p className="text-xs text-rose-400 mt-1">{formErrors.recipientName}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Teléfono de Contacto</label>
-                <input
-                  type="tel"
-                  value={deliveryInfo.recipientPhone}
-                  onChange={(e) => dispatch(updateDeliveryInfo({ recipientPhone: e.target.value }))}
-                  placeholder="Ej: 3001234567"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-                />
-                {formErrors.recipientPhone && <p className="text-xs text-rose-400 mt-1">{formErrors.recipientPhone}</p>}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Dirección de Entrega</label>
-              <input
-                type="text"
-                value={deliveryInfo.address}
-                onChange={(e) => dispatch(updateDeliveryInfo({ address: e.target.value }))}
-                placeholder="Ej: Calle 100 # 15-20 Apt 501"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-              />
-              {formErrors.address && <p className="text-xs text-rose-400 mt-1">{formErrors.address}</p>}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Ciudad</label>
-                <input
-                  type="text"
-                  value={deliveryInfo.city}
-                  onChange={(e) => dispatch(updateDeliveryInfo({ city: e.target.value }))}
-                  placeholder="Ej: Bogotá"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-                />
-                {formErrors.city && <p className="text-xs text-rose-400 mt-1">{formErrors.city}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Departamento</label>
-                <input
-                  type="text"
-                  value={deliveryInfo.department}
-                  onChange={(e) => dispatch(updateDeliveryInfo({ department: e.target.value }))}
-                  placeholder="Ej: Cundinamarca"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-                />
-                {formErrors.department && <p className="text-xs text-rose-400 mt-1">{formErrors.department}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Código Postal</label>
-                <input
-                  type="text"
-                  value={deliveryInfo.postalCode}
-                  onChange={(e) => dispatch(updateDeliveryInfo({ postalCode: e.target.value }))}
-                  placeholder="Ej: 110111"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-                />
-                {formErrors.postalCode && <p className="text-xs text-rose-400 mt-1">{formErrors.postalCode}</p>}
-              </div>
-            </div>
-
-            <div className="pt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={handleNextStep}
-                className="gradient-button px-6 py-3 rounded-xl font-semibold text-sm text-white shadow-lg flex items-center space-x-2"
-              >
-                <span>Continuar al Pago</span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: CARD DETAILS */}
-        {step === 'CARD_DETAILS' && (
-          <form onSubmit={handleSubmitPayment} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-100">Tarjeta de Crédito / Débito</h3>
-
-              {/* Sandbox Quick Fill helper */}
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={() => fillTestCard('APPROVED')}
-                  className="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition font-medium"
-                >
-                  ⚡ Card Aprobada
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillTestCard('DECLINED')}
-                  className="text-xs px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition font-medium"
-                >
-                  ⚡ Card Rechazada
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Nombre del Titular</label>
-              <input
-                type="text"
-                value={cardInfo.cardHolder}
-                onChange={(e) => dispatch(updateCardInfo({ cardHolder: e.target.value.toUpperCase() }))}
-                placeholder="Como aparece en la tarjeta"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100 tracking-wide uppercase"
-              />
-              {formErrors.cardHolder && <p className="text-xs text-rose-400 mt-1">{formErrors.cardHolder}</p>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Número de Tarjeta</label>
-              <input
-                type="text"
-                maxLength={19}
-                value={cardInfo.number}
-                onChange={(e) => dispatch(updateCardInfo({ number: e.target.value.replace(/\D/g, '') }))}
-                placeholder="4242 4242 4242 4242"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100 tracking-widest font-mono"
-              />
-              {formErrors.number && <p className="text-xs text-rose-400 mt-1">{formErrors.number}</p>}
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Mes (MM)</label>
-                <input
-                  type="text"
-                  maxLength={2}
-                  value={cardInfo.expMonth}
-                  onChange={(e) => dispatch(updateCardInfo({ expMonth: e.target.value.replace(/\D/g, '') }))}
-                  placeholder="12"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100 text-center font-mono"
-                />
-                {formErrors.expMonth && <p className="text-xs text-rose-400 mt-1">{formErrors.expMonth}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Año (YY)</label>
-                <input
-                  type="text"
-                  maxLength={2}
-                  value={cardInfo.expYear}
-                  onChange={(e) => dispatch(updateCardInfo({ expYear: e.target.value.replace(/\D/g, '') }))}
-                  placeholder="30"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100 text-center font-mono"
-                />
-                {formErrors.expYear && <p className="text-xs text-rose-400 mt-1">{formErrors.expYear}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">CVC</label>
-                <input
-                  type="password"
-                  maxLength={4}
-                  value={cardInfo.cvc}
-                  onChange={(e) => dispatch(updateCardInfo({ cvc: e.target.value.replace(/\D/g, '') }))}
-                  placeholder="123"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100 text-center font-mono"
-                />
-                {formErrors.cvc && <p className="text-xs text-rose-400 mt-1">{formErrors.cvc}</p>}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Número de Cuotas</label>
-              <select
-                value={installments}
-                onChange={(e) => dispatch(setInstallments(Number(e.target.value)))}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-100"
-              >
-                {Array.from({ length: 36 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>
-                    {n} {n === 1 ? 'cuota' : 'cuotas'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="pt-6 flex justify-between items-center">
-              <button
-                type="button"
-                onClick={() => dispatch(setStep('DELIVERY_INFO'))}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm font-semibold hover:bg-slate-700 transition"
-              >
-                Atrás
-              </button>
-
-              <button
-                type="submit"
-                className="gradient-button px-6 py-3 rounded-xl font-semibold text-sm text-white shadow-lg flex items-center space-x-2"
-              >
-                <span>Pagar con Wompi</span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* STEP 3: PROCESSING */}
-        {step === 'PROCESSING' && (
-          <div className="py-12 text-center space-y-6">
-            <div className="w-16 h-16 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin mx-auto"></div>
-            <div>
-              <h3 className="text-xl font-bold text-slate-100">Procesando Transacción</h3>
-              <p className="text-sm text-slate-400 mt-2">
-                Conectando con la pasarela Wompi y reservando producto en inventario...
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: CONFIRMATION */}
-        {step === 'CONFIRMATION' && orderResult && (
-          <div className="space-y-6">
-            <div className="text-center space-y-2">
-              <div
-                className={`w-14 h-14 rounded-full mx-auto flex items-center justify-center ${
-                  orderResult.wompiStatus === 'APPROVED'
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                    : orderResult.wompiStatus === 'DECLINED'
-                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                }`}
-              >
-                {orderResult.wompiStatus === 'APPROVED' ? (
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                )}
-              </div>
-
-              <h3 className="text-xl font-extrabold text-slate-100">
-                {orderResult.wompiStatus === 'APPROVED'
-                  ? '¡Pago Aprobado!'
-                  : orderResult.wompiStatus === 'DECLINED'
-                  ? 'Transacción Rechazada'
-                  : 'Transacción Pendiente'}
-              </h3>
-
-              <p className="text-sm text-slate-400">
-                {orderResult.wompiStatus === 'APPROVED'
-                  ? 'Tu orden ha sido procesada exitosamente y el inventario ha sido actualizado.'
-                  : 'Wompi no pudo procesar el pago con los datos ingresados.'}
-              </p>
-            </div>
-
-            {/* Details Box */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">ID de Usuario (Comprador)</span>
-                <span className="font-mono text-indigo-400 font-bold">{orderResult.order.userId}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">ID de Orden (Sistema)</span>
-                <span className="font-mono text-slate-200">{orderResult.order.id}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">ID Transacción Wompi</span>
-                <span className="font-mono text-slate-200">{orderResult.wompiTransactionId}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Monto Total</span>
-                <span className="font-bold text-white text-sm">{formattedPrice}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={() => dispatch(closeCheckout())}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-200 text-sm font-semibold hover:bg-slate-700 transition"
-              >
-                Cerrar
-              </button>
-
-              <a
-                href={`/payment-result?transactionId=${orderResult.wompiTransactionId}&userId=${orderResult.order.userId}`}
-                className="gradient-button px-6 py-2.5 rounded-xl font-semibold text-sm text-white shadow-lg inline-flex items-center space-x-2"
-              >
-                <span>Ver Resumen Completo</span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </a>
-            </div>
-          </div>
-        )}
       </div>
     </div>
-  )
-}
+  );
+};
