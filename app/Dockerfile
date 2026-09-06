@@ -1,6 +1,6 @@
 FROM node:22-alpine AS development
 
-WORKDIR /app
+WORKDIR /application
 
 RUN apk add --no-cache libc6-compat
 
@@ -15,7 +15,7 @@ CMD ["npm", "run", "dev"]
 
 FROM node:22-alpine AS build
 
-WORKDIR /app
+WORKDIR /application
 
 COPY package*.json ./
 RUN npm ci
@@ -25,9 +25,9 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS production
 
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /application/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE $PORT
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
