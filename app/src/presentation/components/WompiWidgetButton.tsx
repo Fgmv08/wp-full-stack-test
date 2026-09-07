@@ -25,13 +25,27 @@ export interface WompiWidgetButtonProps {
     name?: string;
     postalCode?: string;
   };
+  /**
+   * Datos de tarjeta para pre-llenar el widget de Wompi.
+   * Wompi los acepta como data-attributes opcionales.
+   */
+  cardData?: {
+    number?: string;
+    cvc?: string;
+    expMonth?: string;
+    expYear?: string;
+    cardHolder?: string;
+  };
   className?: string;
 }
 
 /**
  * WompiWidgetButton
  * Integración oficial del Widget de Wompi mediante inyección dinámica del script
- * con data-attributes (<form><script src="https://checkout.wompi.co/widget.js" data-render="button" ...></script></form>)
+ * con data-attributes (<form><script src="https://checkout.wompi.co/widget.js" data-render="button" ...></script></form>).
+ *
+ * Se restringe el pago a únicamente TARJETA DE CRÉDITO/DÉBITO mediante
+ * data-payment-method-type="CARD".
  */
 export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
   publicKey,
@@ -42,21 +56,12 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
   redirectUrl,
   customerData,
   shippingAddress,
+  cardData,
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-
-    console.log(publicKey)
-    console.log(currency)
-    console.log(amountInCents)
-    console.log(reference)
-    console.log(signatureIntegrity)
-    console.log(redirectUrl)
-    console.log(customerData)
-    console.log(shippingAddress)
-    console.log(className)
     const container = containerRef.current;
     if (!container) return;
 
@@ -68,9 +73,10 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
     form.className = 'w-full flex justify-center';
 
     // Las credenciales pub_stagtest pertenecen al entorno UAT/Staging
-    const widgetUrl = publicKey.includes('stagtest') || publicKey.includes('uat')
-      ? 'https://checkout.co.uat.wompi.dev/widget.js'
-      : 'https://checkout.wompi.co/widget.js';
+    const widgetUrl =
+      publicKey.includes('stagtest') || publicKey.includes('uat')
+        ? 'https://checkout.co.uat.wompi.dev/widget.js'
+        : 'https://checkout.wompi.co/widget.js';
 
     // Crear etiqueta <script> oficial de Wompi con atributos requeridos
     const script = document.createElement('script');
@@ -81,6 +87,11 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
     script.setAttribute('data-amount-in-cents', String(amountInCents));
     script.setAttribute('data-reference', reference);
     script.setAttribute('data-signature:integrity', signatureIntegrity);
+
+    // ── Restringir a solo tarjeta ──────────────────────────────────────────
+    // Wompi soporta: CARD, NEQUI, BANCOLOMBIA_TRANSFER, etc.
+    // Al indicar CARD se ocultan todos los demás métodos de pago.
+    script.setAttribute('data-payment-method-type', 'CARD');
 
     if (redirectUrl) {
       script.setAttribute('data-redirect-url', redirectUrl);
@@ -129,6 +140,27 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
       script.setAttribute('data-shipping-address:name', shippingAddress.name);
     }
 
+    // ── Datos de tarjeta pre-llenados ─────────────────────────────────────
+    // Wompi acepta data-card:* para pre-rellenar la tarjeta en el widget
+    if (cardData?.number) {
+      // Eliminar espacios antes de enviar al widget
+      script.setAttribute('data-card:number', cardData.number.replace(/\s+/g, ''));
+    }
+    if (cardData?.cvc) {
+      script.setAttribute('data-card:cvc', cardData.cvc);
+    }
+    if (cardData?.expMonth) {
+      script.setAttribute('data-card:exp-month', cardData.expMonth);
+    }
+    if (cardData?.expYear) {
+      // Wompi espera YYYY; si llega YY lo expandimos
+      const year = cardData.expYear.length === 2 ? `20${cardData.expYear}` : cardData.expYear;
+      script.setAttribute('data-card:exp-year', year);
+    }
+    if (cardData?.cardHolder) {
+      script.setAttribute('data-card:card-holder', cardData.cardHolder);
+    }
+
     form.appendChild(script);
     container.appendChild(form);
 
@@ -146,6 +178,7 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
     redirectUrl,
     customerData,
     shippingAddress,
+    cardData,
   ]);
 
   return (

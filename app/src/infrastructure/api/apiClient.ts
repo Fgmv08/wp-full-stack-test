@@ -1,7 +1,16 @@
 import axios from 'axios'
 
 const getBaseUrl = (): string => {
-  return import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+  // En producción usamos la URL absoluta del backend (inyectada en build time).
+  // En desarrollo usamos /api (ruta relativa) para que el proxy de Vite
+  // reenvíe la petición al backend — esto funciona tanto desde localhost
+  // como desde otros dispositivos en la misma red Wi-Fi, porque el proxy
+  // corre en la PC (no en el navegador del cliente).
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  // Fallback: ruta relativa → el proxy de Vite maneja el reenvío
+  return '/api'
 }
 
 export const apiClient = axios.create({

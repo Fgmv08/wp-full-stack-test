@@ -22,13 +22,13 @@ export const HomePage: React.FC = () => {
         {/* Hero Banner */}
         <section className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto pt-2 sm:pt-4">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
-            <span>🚀 Prueba Técnica Onboarding Wompi</span>
+            <span>🚀 Shop Store</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
             Compra segura con <span className="gradient-text">Pasarela Wompi</span>
           </h1>
           <p className="text-sm sm:text-base text-slate-400 leading-relaxed max-w-2xl mx-auto">
-            Selecciona tu producto, ingresa los datos de pago y entrega, y procesa la transacción de forma inmediata y segura con el Widget oficial de Wompi.
+            Selecciona tu producto, ingresa los datos de pago y entrega, y procesa la transacción de forma inmediata y segura con Wompi.
           </p>
         </section>
 

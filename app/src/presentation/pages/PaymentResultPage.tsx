@@ -117,27 +117,7 @@ export const PaymentResultPage: React.FC = () => {
                 </span>
               </div>
             </div>
-
-            {/* Buyer User ID Card - Highlighting User ID as requested */}
-            <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <span className="text-xs text-indigo-300 font-semibold block">ID del Usuario Comprador</span>
-                  <span className="text-sm font-mono font-bold text-white tracking-wide">
-                    {transaction.order?.userId || userIdParam || 'N/A'}
-                  </span>
-                </div>
-              </div>
-              <span className="text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 font-mono">
-                Consultado en Backend DB
-              </span>
-            </div>
-
+            
             {/* Detailed Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* Order Info */}

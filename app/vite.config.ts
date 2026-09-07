@@ -14,12 +14,17 @@ export default defineConfig({
     allowedHosts: true,
     cors: true,
     proxy: {
+      // Reenvía /api/* al backend local en desarrollo.
+      // Al usar ruta relativa (/api) en el frontend, este proxy corre en la PC
+      // y funciona tanto desde localhost como desde el teléfono en la misma Wi-Fi.
       '/api': {
-        target: 'http://server:8080',
+        target: 'http://localhost:8080',
         changeOrigin: true,
+        // ws: true,  // descomentar si se añaden WebSockets
       },
     },
   },
+
   resolve: {
     alias: {
       '@': '/src',

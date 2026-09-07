@@ -69,19 +69,37 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <button
             onClick={() => dispatch(openCheckout(product))}
             disabled={isOutOfStock}
-            className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+            aria-label={isOutOfStock ? 'Sin stock' : 'Pagar'}
+            className={`px-3 min-[521px]:px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center gap-1.5 ${
               isOutOfStock
                 ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 : 'gradient-button text-white shadow-lg shadow-indigo-500/25 active:scale-95'
             }`}
           >
-            <span>{isOutOfStock ? 'Sin Stock' : 'Pagar'}</span>
-            {!isOutOfStock && (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            {/* Texto: oculto en pantallas ≤520px */}
+            <span className="hidden min-[521px]:inline whitespace-nowrap">
+              {isOutOfStock ? 'Sin Stock' : 'Pagar'}
+            </span>
+
+            {/* Ícono: siempre visible */}
+            {isOutOfStock ? (
+              /* ícono "x" para sin stock en mobile */
+              <svg className="w-4 h-4 min-[521px]:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
+            ) : (
+              /* ícono tarjeta en mobile, flecha en desktop */
+              <>
+                <svg className="w-4 h-4 min-[521px]:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <svg className="w-4 h-4 hidden min-[521px]:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </>
             )}
           </button>
+
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import type { DeliveryInfo } from '@/domain/entities/Cart'
 import type { CardInfo, Order } from '@/domain/entities/Order'
 import { HttpPaymentRepository } from '@/infrastructure/api/HttpPaymentRepository'
 import type { CreateOrderResult, DataPaymentResult } from '@/domain/ports/IPaymentRepository'
+import { clearCheckoutState } from '@/shared/utils/checkoutPersistence'
 
 const paymentRepo = new HttpPaymentRepository()
 
@@ -98,6 +99,8 @@ const checkoutSlice = createSlice({
     closeCheckout: (state) => {
       state.isOpen = false
       state.error = null
+      // Limpiar persistencia para que el modal no reaparezca en el próximo refresh
+      clearCheckoutState()
     },
     setStep: (state, action: PayloadAction<CheckoutStep>) => {
       state.step = action.payload
@@ -121,7 +124,10 @@ const checkoutSlice = createSlice({
     setInstallments: (state, action: PayloadAction<number>) => {
       state.installments = action.payload
     },
-    resetCheckout: () => initialState,
+    resetCheckout: () => {
+      clearCheckoutState()
+      return initialState
+    },
   },
   extraReducers: (builder) => {
     builder

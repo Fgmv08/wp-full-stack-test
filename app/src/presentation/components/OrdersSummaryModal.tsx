@@ -65,7 +65,7 @@ export const OrdersSummaryModal: React.FC = () => {
         </div>
 
         {/* Modal Body with smooth scrolling */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
           {loading && orders.length === 0 ? (
             <div className="py-12 text-center space-y-3">
               <div className="w-10 h-10 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin mx-auto"></div>

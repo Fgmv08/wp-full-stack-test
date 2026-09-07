@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/store';
 import {
   closeCheckout,
@@ -63,7 +63,6 @@ export const CheckoutModal: React.FC = () => {
     maximumFractionDigits: 0,
   }).format(product.priceCents / 100);
 
-  // ── Step 1 Validation (Card Details) ──────────────────────────
   const validateCard = (): boolean => {
     const errors: Record<string, string> = {};
     const cleanNum = cardInfo.number.replace(/\s+/g, '');
@@ -71,7 +70,7 @@ export const CheckoutModal: React.FC = () => {
     if (!cleanNum || cleanNum.length < 13 || cleanNum.length > 19) {
       errors.number = 'Número de tarjeta inválido (13 a 19 dígitos)';
     } else if (!validateLuhn(cleanNum)) {
-      errors.number = 'Número de tarjeta inválido según algoritmo Luhn';
+      errors.number = 'Número de tarjeta inválido';
     }
 
     if (!cardInfo.cardHolder || cardInfo.cardHolder.trim().length < 3) {
@@ -136,6 +135,7 @@ export const CheckoutModal: React.FC = () => {
     }
   };
 
+  // ! Simplemente para fácilitar la prueba del pago sandbox, 
   const fillTestCard = (type: 'APPROVED' | 'DECLINED') => {
     if (type === 'APPROVED') {
       const formatted = formatCardNumber('4242424242424242');
@@ -143,18 +143,18 @@ export const CheckoutModal: React.FC = () => {
         updateCardInfo({
           number: formatted,
           cvc: '123',
-          cardHolder: 'CARLOS MENDOZA (APROBADA)',
+          cardHolder: 'CARLOS MENDOZA',
           brand: 'VISA',
         })
       );
       dispatch(setExpiryInput('12/30'));
     } else {
-      const formatted = formatCardNumber('5306200221224312');
+      const formatted = formatCardNumber('4111111111111111');
       dispatch(
         updateCardInfo({
           number: formatted,
           cvc: '123',
-          cardHolder: 'MARIA GOMEZ (RECHAZADA)',
+          cardHolder: 'MARIA GOMEZ',
           brand: 'MASTERCARD',
         })
       );
@@ -176,12 +176,12 @@ export const CheckoutModal: React.FC = () => {
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
                 {step === 'CARD_DETAILS'
-                  ? '1. Datos de Tarjeta Débito'
+                  ? '1. Información de pago'
                   : step === 'DELIVERY_INFO'
-                  ? '2. Datos de Envío'
-                  : '3. Resumen y Pago Wompi'}
+                    ? '2. Información de envío'
+                    : '3. Resumen y Pago'}
               </h3>
-              <p className="text-xs text-slate-400">Onboarding de pago seguro con Wompi (Sandbox)</p>
+              <p className="text-xs text-slate-400">Onboarding de pago seguro shop store (Sandbox)</p>
             </div>
           </div>
 
@@ -202,28 +202,26 @@ export const CheckoutModal: React.FC = () => {
         <div className="px-4 sm:px-6 py-3 bg-slate-950/50 border-b border-slate-800/80 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-2">
             <span
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === 'CARD_DETAILS'
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 'CARD_DETAILS'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-              }`}
+                }`}
             >
               {step !== 'CARD_DETAILS' ? '✓' : '1'}
             </span>
-            <span className="text-xs font-semibold text-slate-300">Tarjeta Débito</span>
+            <span className="text-xs font-semibold text-slate-300">Información de pago</span>
           </div>
 
           <div className="w-8 sm:w-16 h-0.5 bg-slate-800"></div>
 
           <div className="flex items-center space-x-2">
             <span
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === 'DELIVERY_INFO'
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 'DELIVERY_INFO'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
                   : step === 'CONFIRMATION'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                  : 'bg-slate-800 text-slate-500'
-              }`}
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-slate-800 text-slate-500'
+                }`}
             >
               {step === 'CONFIRMATION' ? '✓' : '2'}
             </span>
@@ -234,11 +232,10 @@ export const CheckoutModal: React.FC = () => {
 
           <div className="flex items-center space-x-2">
             <span
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === 'CONFIRMATION'
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 'CONFIRMATION'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/50'
                   : 'bg-slate-800 text-slate-500'
-              }`}
+                }`}
             >
               3
             </span>
@@ -247,7 +244,7 @@ export const CheckoutModal: React.FC = () => {
         </div>
 
         {/* ── Scrollable Body ── */}
-        <div className="p-4 sm:p-7 overflow-y-auto flex-1 space-y-5">
+        <div className="p-4 sm:p-7 overflow-y-auto flex-1 space-y-5 custom-scrollbar">
           {/* Product Summary Banner */}
           <div className="flex items-center space-x-3.5 p-3 sm:p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
             <img
@@ -257,10 +254,10 @@ export const CheckoutModal: React.FC = () => {
             />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-xs sm:text-sm text-slate-100 truncate">{product.name}</h4>
-              <p className="text-[11px] text-slate-400">Disponibles: {product.stock} unidades</p>
+              <p className="text-[11px] text-slate-400">{product.stock} unidad{product.stock === 1 ? '' : 'es'} disponible{product.stock === 1 ? '' : 's'}</p>
             </div>
             <div className="text-right flex-shrink-0">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total</span>
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Precio</span>
               <span className="text-base sm:text-lg font-black text-indigo-400">{formattedPrice}</span>
             </div>
           </div>
@@ -281,21 +278,23 @@ export const CheckoutModal: React.FC = () => {
             <form onSubmit={handleCardNext} className="space-y-4">
               {/* Quick Fill Test Cards */}
               <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs">
-                <span className="text-slate-400 font-medium">Pruebas Sandbox (Débito):</span>
+                <span className="text-slate-400 font-medium">Shema Visa (Pruebas Sandbox):</span>
                 <div className="flex space-x-2">
                   <button
                     type="button"
+                    title='Para aprobar el pago en la prueba'
                     onClick={() => fillTestCard('APPROVED')}
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition font-semibold"
                   >
-                    ⚡ Visa Débito Aprobada
+                    ⚡ Visa Aprobada
                   </button>
                   <button
                     type="button"
+                    title='Para rechazar el pago en la prueba'
                     onClick={() => fillTestCard('DECLINED')}
                     className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition font-semibold"
                   >
-                    ⚡ Rechazada
+                    ⚡ Visa Rechazada
                   </button>
                 </div>
               </div>
@@ -303,7 +302,7 @@ export const CheckoutModal: React.FC = () => {
               {/* Card Number Input with Brand Logo Detection */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-300">Número de Tarjeta Débito</label>
+                  <label className="block text-xs font-semibold text-slate-300">Número de Tarjeta de Crédito</label>
                   {/* Brand Badge */}
                   <div className="flex items-center space-x-1.5">
                     {cardBrand === 'VISA' && (
@@ -341,11 +340,10 @@ export const CheckoutModal: React.FC = () => {
                     if (formErrors.number) setFormErrors({ ...formErrors, number: '' });
                   }}
                   placeholder="4242  4242  4242  4242"
-                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition tracking-widest font-mono ${
-                    formErrors.number
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition tracking-widest font-mono ${formErrors.number
                       ? 'border-rose-500 focus:border-rose-400'
                       : 'border-slate-800 focus:border-indigo-500'
-                  }`}
+                    }`}
                 />
                 {formErrors.number && <p className="text-xs text-rose-400 mt-1">{formErrors.number}</p>}
               </div>
@@ -361,11 +359,10 @@ export const CheckoutModal: React.FC = () => {
                     if (formErrors.cardHolder) setFormErrors({ ...formErrors, cardHolder: '' });
                   }}
                   placeholder="CARLOS MENDOZA"
-                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition uppercase tracking-wide ${
-                    formErrors.cardHolder
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition uppercase tracking-wide ${formErrors.cardHolder
                       ? 'border-rose-500 focus:border-rose-400'
                       : 'border-slate-800 focus:border-indigo-500'
-                  }`}
+                    }`}
                 />
                 {formErrors.cardHolder && <p className="text-xs text-rose-400 mt-1">{formErrors.cardHolder}</p>}
               </div>
@@ -387,11 +384,10 @@ export const CheckoutModal: React.FC = () => {
                       if (formErrors.expiry) setFormErrors({ ...formErrors, expiry: '' });
                     }}
                     placeholder="12/28"
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition text-center font-mono tracking-wider ${
-                      formErrors.expiry
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition text-center font-mono tracking-wider ${formErrors.expiry
                         ? 'border-rose-500 focus:border-rose-400'
                         : 'border-slate-800 focus:border-indigo-500'
-                    }`}
+                      }`}
                   />
                   {formErrors.expiry && <p className="text-xs text-rose-400 mt-1">{formErrors.expiry}</p>}
                 </div>
@@ -408,26 +404,21 @@ export const CheckoutModal: React.FC = () => {
                       if (formErrors.cvc) setFormErrors({ ...formErrors, cvc: '' });
                     }}
                     placeholder="123"
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition text-center font-mono ${
-                      formErrors.cvc
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition text-center font-mono ${formErrors.cvc
                         ? 'border-rose-500 focus:border-rose-400'
                         : 'border-slate-800 focus:border-indigo-500'
-                    }`}
+                      }`}
                   />
                   {formErrors.cvc && <p className="text-xs text-rose-400 mt-1">{formErrors.cvc}</p>}
                 </div>
               </div>
-
-              {/* Informative notice: Débito en 1 pago sin cuotas */}
               <div className="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <span>
-                  <strong>Modalidad Débito:</strong> El pago se efectúa directamente en 1 sola cuota contra los fondos disponibles de tu cuenta bancaria.
-                </span>
+                <span className="text-xs text-slate-400">Información Asegurada</span>
               </div>
 
               {/* Actions */}
@@ -450,13 +441,6 @@ export const CheckoutModal: React.FC = () => {
              ═══════════════════════════════════════════════════════════════ */}
           {step === 'DELIVERY_INFO' && (
             <form onSubmit={handleDeliverySubmit} className="space-y-4">
-              <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
-                <span>👤 Datos cargados por defecto del sistema (puedes editarlos)</span>
-                <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 font-mono">
-                  CC 1023456789
-                </span>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo</label>
@@ -468,9 +452,8 @@ export const CheckoutModal: React.FC = () => {
                       if (formErrors.recipientName) setFormErrors({ ...formErrors, recipientName: '' });
                     }}
                     placeholder="Carlos Mendoza"
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
-                      formErrors.recipientName ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${formErrors.recipientName ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                      }`}
                   />
                   {formErrors.recipientName && <p className="text-xs text-rose-400 mt-1">{formErrors.recipientName}</p>}
                 </div>
@@ -485,9 +468,8 @@ export const CheckoutModal: React.FC = () => {
                       if (formErrors.recipientPhone) setFormErrors({ ...formErrors, recipientPhone: '' });
                     }}
                     placeholder="3001234567"
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
-                      formErrors.recipientPhone ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${formErrors.recipientPhone ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                      }`}
                   />
                   {formErrors.recipientPhone && <p className="text-xs text-rose-400 mt-1">{formErrors.recipientPhone}</p>}
                 </div>
@@ -503,9 +485,8 @@ export const CheckoutModal: React.FC = () => {
                     if (formErrors.address) setFormErrors({ ...formErrors, address: '' });
                   }}
                   placeholder="Calle 100 # 15-20 Apt 501"
-                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
-                    formErrors.address ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${formErrors.address ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                    }`}
                 />
                 {formErrors.address && <p className="text-xs text-rose-400 mt-1">{formErrors.address}</p>}
               </div>
@@ -558,9 +539,8 @@ export const CheckoutModal: React.FC = () => {
                       if (formErrors.postalCode) setFormErrors({ ...formErrors, postalCode: '' });
                     }}
                     placeholder="110111"
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
-                      formErrors.postalCode ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${formErrors.postalCode ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
+                      }`}
                   />
                   {formErrors.postalCode && <p className="text-xs text-rose-400 mt-1">{formErrors.postalCode}</p>}
                 </div>
@@ -652,7 +632,7 @@ export const CheckoutModal: React.FC = () => {
                 <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
                   <span className="font-bold text-slate-300 block">Método de Pago</span>
                   <p className="text-slate-400 flex items-center space-x-1">
-                    <span>Tarjeta Débito:</span>
+                    <span>Tarjeta:</span>
                     <span className="font-mono text-white">
                       •••• {cardInfo.number.replace(/\s+/g, '').slice(-4) || '4242'}
                     </span>
@@ -667,18 +647,12 @@ export const CheckoutModal: React.FC = () => {
                   <span className="text-indigo-300 font-semibold">Referencia de Pago:</span>
                   <span className="font-mono font-bold text-white text-[11px]">{dataPaymentResult.reference}</span>
                 </div>
-                <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                  <span>Firma Integridad Wompi:</span>
-                  <span className="font-mono text-slate-300 truncate max-w-[200px]" title={dataPaymentResult.signature.integrity}>
-                    {dataPaymentResult.signature.integrity.substring(0, 16)}...
-                  </span>
-                </div>
               </div>
 
               {/* Official Wompi Widget Button rendered dynamically */}
               <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col items-center justify-center space-y-3">
                 <span className="text-xs text-slate-300 font-semibold">
-                  Haz clic en el botón oficial de Wompi para abrir la pasarela:
+                  Haz clic para abrir la pasarela
                 </span>
                 <WompiWidgetButton
                   publicKey={dataPaymentResult.publicKey}
