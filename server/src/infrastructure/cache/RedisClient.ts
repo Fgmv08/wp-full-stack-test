@@ -51,3 +51,16 @@ export async function cacheDel(key: string): Promise<void> {
     console.warn(`[Redis] Cache del error for key "${key}":`, (err as Error).message);
   }
 }
+
+export async function closeRedisClient(): Promise<void> {
+  if (redisClient) {
+    try {
+      await redisClient.quit();
+    } catch {
+      redisClient.disconnect();
+    } finally {
+      redisClient = null;
+    }
+  }
+}
+

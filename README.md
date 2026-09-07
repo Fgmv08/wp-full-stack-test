@@ -351,6 +351,32 @@ El sistema cuenta con inicialización inteligente:
 - **Principios DRY & Modularidad**: Funciones utilitarias, formateadores de moneda, ganchos personalizados de React y componentes atómicos reutilizables.
 - **Responsividad Completa**: Adaptación de interfaz para desktop, tablets y dispositivos móviles con resoluciones reducidas ($\le 520\text{px}$).
 
+## 🧪 Pruebas Automatizadas
+
+El proyecto implementa una estrategia de calidad y testing integral en ambas capas (Backend y Frontend):
+
+### Backend (`server/`) — Jest + Supertest
+- **69 pruebas automatizadas** que cubren casos de uso, controladores, repositorios, adaptadores Wompi/Redis y middlewares.
+- Ejecución:
+  ```bash
+  cd server
+  npm test               # Ejecutar toda la suite de pruebas
+  npm run test:watch     # Modo observador interactivo
+  npm run test:coverage  # Reporte de cobertura de código
+  ```
+- Detalle de arquitectura y casos: [Documentación de Testing Backend](file:///doc/backend_testing.md).
+
+### Frontend (`app/`) — Vitest + React Testing Library
+- **67 pruebas automatizadas** distribuidas en 12 suites cubriendo componentes UI, flujos de Redux Toolkit y utilidades de tarjeta/persistencia.
+- Ejecución:
+  ```bash
+  cd app
+  npm test               # Ejecutar toda la suite de pruebas frontend
+  npm run test:watch     # Modo observador interactivo
+  npm run test:coverage  # Reporte de cobertura de código
+  ```
+- Detalle de arquitectura y casos: [Documentación de Testing Frontend](file:///doc/frontend_testing.md).
+
 ---
 
 <p align="center">Desarrollado con dedicación técnica, buenas prácticas y arquitectura de software escalable.</p>
