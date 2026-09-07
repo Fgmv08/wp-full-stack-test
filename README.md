@@ -1,6 +1,8 @@
 # 🛍️ E-Commerce Payment Gateway (Full Stack - Wom+*& Integration)
 
-> Aplicación web Full Stack para comercio electrónico con integración de pasarela de pagos Wom+*& (Sandbox), diseñada bajo los principios de **Clean Architecture / Arquitectura Hexagonal**, **SOLID**, **Domain-Driven Design (DDD)** y desplegable con **Docker y Docker Compose**.
+> Aplicación web Full Stack para comercio electrónico con integración de pasarela de pagos Wom+*& (Sandbox), diseñada bajo los principios de **Clean Architecture / Arquitectura Hexagonal**, **SOLID**, **Domain-Driven Design (DDD)** y desplegable con **Docker y Docker Compose**. la cual funciona actualmente en Render: [Frontend](https://frontend-rl58.onrender.com/), y [Backend](https://wp-full-stack-test.onrender.com). Trabajando de la mano con PostgreSQL y Redis. 
+
+![alt text](image.png)
 
 ---
 
