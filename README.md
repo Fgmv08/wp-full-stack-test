@@ -418,7 +418,7 @@ El proyecto implementa una estrategia de calidad y testing integral en ambas cap
   npm run test:watch     # Modo observador interactivo
   npm run test:coverage  # Reporte de cobertura de código
   ```
-- Detalle de arquitectura y casos: [Documentación de Testing Backend](file:///doc/backend_testing.md).
+- Detalle de arquitectura y casos: [Documentación de Testing Backend](https://github.com/Fgmv08/wp-full-stack-test/blob/master/doc/backend_testing.md).
 
 ### Frontend (`app/`) — Vitest + React Testing Library
 - **67 pruebas automatizadas** distribuidas en 12 suites cubriendo componentes UI, flujos de Redux Toolkit y utilidades de tarjeta/persistencia.
@@ -429,7 +429,7 @@ El proyecto implementa una estrategia de calidad y testing integral en ambas cap
   npm run test:watch     # Modo observador interactivo
   npm run test:coverage  # Reporte de cobertura de código
   ```
-- Detalle de arquitectura y casos: [Documentación de Testing Frontend](file:///doc/frontend_testing.md).
+- Detalle de arquitectura y casos: [Documentación de Testing Frontend](https://github.com/Fgmv08/wp-full-stack-test/blob/master/doc/frontend_testing.md).
 
 ---
 

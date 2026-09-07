@@ -1,4 +1,4 @@
-# 🧪 Documentación de Pruebas Automatizadas en el Backend
+.# 🧪 Documentación de Pruebas Automatizadas en el Backend
 
 Este documento detalla la suite completa de pruebas unitarias y de integración implementadas con **Jest** y **Supertest** para el servidor backend, cubriendo la arquitectura hexagonal, casos de uso de la capa de aplicación, adaptadores de infraestructura y rutas HTTP con middlewares.
 
