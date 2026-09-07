@@ -36,6 +36,7 @@ export interface WompiWidgetButtonProps {
     expYear?: string;
     cardHolder?: string;
   };
+  onWidgetOpen?: () => void;
   className?: string;
 }
 
@@ -57,6 +58,7 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
   customerData,
   shippingAddress,
   cardData,
+  onWidgetOpen,
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,7 +166,15 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
     form.appendChild(script);
     container.appendChild(form);
 
+    const handleFormClick = () => {
+      if (onWidgetOpen) {
+        onWidgetOpen();
+      }
+    };
+    form.addEventListener('click', handleFormClick);
+
     return () => {
+      form.removeEventListener('click', handleFormClick);
       if (container) {
         container.innerHTML = '';
       }
@@ -179,6 +189,7 @@ export const WompiWidgetButton: React.FC<WompiWidgetButtonProps> = ({
     customerData,
     shippingAddress,
     cardData,
+    onWidgetOpen,
   ]);
 
   return (

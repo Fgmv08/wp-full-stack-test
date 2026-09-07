@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../redux/store'
 import { confirmPaymentStatus, fetchTransactionStatus } from '../redux/slices/transactionSlice'
+import { resetCheckout } from '../redux/slices/checkoutSlice'
 import { Header } from '../components/Header'
 
 export const PaymentResultPage: React.FC = () => {
@@ -14,6 +15,9 @@ export const PaymentResultPage: React.FC = () => {
   const userIdParam = searchParams.get('userId') || ''
 
   useEffect(() => {
+    // Al cargar la vista de resultado, garantizar que el modal y su persistencia queden reseteados
+    dispatch(resetCheckout())
+
     if (wompiTxId) {
       // First confirm payment with Wompi to get latest status, then fetch
       dispatch(confirmPaymentStatus(wompiTxId))
@@ -53,7 +57,7 @@ export const PaymentResultPage: React.FC = () => {
         ) : loading ? (
           <div className="glass-card rounded-3xl p-12 text-center max-w-md w-full border border-slate-800 space-y-4">
             <div className="w-14 h-14 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin mx-auto"></div>
-            <h3 className="text-lg font-bold text-slate-100">Verificando Pago con Backend y Wompi...</h3>
+            <h3 className="text-lg font-bold text-slate-100">Verificando Pago de Wompi...</h3>
             <p className="text-xs text-slate-400">Consultando estado de transacción ID: {wompiTxId}</p>
           </div>
         ) : error ? (
@@ -174,6 +178,7 @@ export const PaymentResultPage: React.FC = () => {
             <div className="pt-4 flex justify-center">
               <Link
                 to="/"
+                onClick={() => dispatch(resetCheckout())}
                 className="gradient-button px-8 py-3 rounded-xl font-bold text-sm text-white shadow-xl flex items-center space-x-2"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

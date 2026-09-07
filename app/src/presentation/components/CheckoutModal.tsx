@@ -7,6 +7,7 @@ import {
   updateCardInfo,
   setExpiryInput,
   requestDataPayment,
+  resetCheckout,
 } from '../redux/slices/checkoutSlice';
 import {
   validateLuhn,
@@ -663,6 +664,9 @@ export const CheckoutModal: React.FC = () => {
                   redirectUrl={dataPaymentResult.redirectUrl}
                   customerData={dataPaymentResult.customerData}
                   shippingAddress={dataPaymentResult.shippingAddress}
+                  onWidgetOpen={() => {
+                    dispatch(resetCheckout());
+                  }}
                 />
               </div>
 
