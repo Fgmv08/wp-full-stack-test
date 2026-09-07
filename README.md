@@ -314,25 +314,79 @@ El proceso de compra cumple con las directrices de seguridad y tokens de Wompi:
 
 ---
 
-## 📡 Endpoints de la API
+## 📡 Endpoints de la API & Colección
 
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/health` | Chequeo de salud del servicio |
-| `GET` | `/api/products` | Obtiene el catálogo completo de productos con stock |
-| `GET` | `/api/products/:id` | Detalle de un producto específico |
-| `POST` | `/api/orders` | Creación de orden de compra |
-| `GET` | `/api/orders/:id` | Consulta de orden y estado de transacción |
-| `POST` | `/api/payment/process` | Procesa el pago con el token de tarjeta generado |
-| `POST` | `/api/datapayment` | Endpoint de webhook / sincronización de pago |
+La API REST expone contratos claros con validación Zod y códigos HTTP estándar (`200`, `201`, `400`, `404`, `409`, `500`):
+
+| Método | Endpoint | Descripción | Body / Parámetros |
+|---|---|---|---|
+| `GET` | `/health` | Chequeo de salud del servicio | Ninguno |
+| `GET` | `/api/products` | Catálogo completo de productos con stock y caché Redis | Ninguno |
+| `GET` | `/api/products/:id` | Detalle de un producto específico | `id` (UUID en path) |
+| `GET` | `/api/cart` | Obtiene el usuario activo y su orden en proceso | Ninguno |
+| `GET` | `/api/orders` | Listado histórico de órdenes registradas | Ninguno |
+| `GET` | `/api/orders/:id` | Consulta de orden por ID | `id` (UUID en path) |
+| `GET` | `/api/payment/config` | Configuración pública de Wompi (clave pública, tarifas, moneda) | Ninguno |
+| `POST` | `/api/payment/datapayment` | Generación de firma criptográfica SHA-256 e integridad para pasarela | `productId`, `card`, `deliveryInfo` |
+| `POST` | `/api/payment/create-order` | Tokenización de tarjeta y creación de orden transaccional directa | `productId`, `card`, `deliveryInfo`, `redirectUrl` |
+| `POST` | `/api/payment/confirm` | Confirmación e idempotencia del estado de pago con Wompi | `{ wompiTransactionId }` |
+| `GET` | `/api/payment/transaction/:wompiTxId` | Consulta de estado de transacción directamente en Wompi | `wompiTxId` (en path) |
+
+> 📌 **Documentación y Colección**: El detalle de esquemas y payloads de prueba se encuentra documentado en la carpeta [`doc/`](file:///doc/), incluyendo especificaciones de entrada/salida para Postman/Swagger.
 
 ---
 
-## 🗄️ Base de Datos y Auto-Seeding
+## 🗄️ Modelo de Datos (PostgreSQL & TypeORM)
+
+El modelo de datos relacional modela el flujo comercial, trazabilidad y decoupling entre clientes, inventario y órdenes:
+
+```mermaid
+erDiagram
+    USERS ||--o{ ORDERS : "realiza"
+    PRODUCTS ||--o{ ORDERS : "incluidos_en"
+
+    USERS {
+        uuid id PK
+        varchar(100) first_name
+        varchar(100) last_name
+        varchar(255) email UK
+        varchar(20) phone
+        varchar(10) id_type
+        varchar(20) id_number
+        timestamp created_at
+    }
+
+    PRODUCTS {
+        uuid id PK
+        varchar(200) name
+        text description
+        integer price_cents
+        integer stock
+        varchar(500) image_url
+        varchar(100) category
+        timestamp created_at
+    }
+
+    ORDERS {
+        uuid id PK
+        uuid user_id FK
+        jsonb product_ids
+        enum status "PENDING | APPROVED | DECLINED | ERROR | VOIDED"
+        varchar reference
+        varchar wompi_transaction_id
+        integer total_amount_cents
+        integer base_fee_cents
+        integer shipping_fee_cents
+        jsonb delivery_info
+        jsonb card_info
+        timestamp created_at
+        timestamp updated_at
+    }
+```
 
 El sistema cuenta con inicialización inteligente:
 
-1. **Auto-Sincronización**: Al arrancar el backend (`AppDataSource.initialize()`), se verifica la existencia de la tabla `users`. Si es un despliegue en limpio (local o en la nube como Render/Neon), sincroniza las tablas automáticamente.
+1. **Auto-Sincronización**: Al arrancar el backend (`AppDataSource.initialize()`), se verifica la existencia de la tabla `users`. Si es un despliegue en limpio (local o en la nube como Render/AWS), sincroniza las tablas automáticamente.
 2. **Auto-Seeding**: Si no se detectan productos en base de datos, el sistema inserta datos de prueba realistas (electrónica, accesorios, calzado) con imágenes, descripciones, stock y precios en pesos colombianos (COP).
 3. **Comandos manuales** (disponibles en `server/package.json`):
    ```bash
