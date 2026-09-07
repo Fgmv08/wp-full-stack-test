@@ -1,6 +1,6 @@
-# 🛍️ E-Commerce Payment Gateway (Full Stack - Wompi Integration)
+# 🛍️ E-Commerce Payment Gateway (Full Stack - Wom+*& Integration)
 
-> Aplicación web Full Stack para comercio electrónico con integración de pasarela de pagos Wompi (Sandbox), diseñada bajo los principios de **Clean Architecture / Arquitectura Hexagonal**, **SOLID**, **Domain-Driven Design (DDD)** y desplegable con **Docker y Docker Compose**.
+> Aplicación web Full Stack para comercio electrónico con integración de pasarela de pagos Wom+*& (Sandbox), diseñada bajo los principios de **Clean Architecture / Arquitectura Hexagonal**, **SOLID**, **Domain-Driven Design (DDD)** y desplegable con **Docker y Docker Compose**.
 
 ---
 
@@ -27,12 +27,12 @@
 
 ## 📌 Descripción General
 
-El proyecto consiste en una tienda virtual y sistema transaccional donde los usuarios pueden consultar catálogo de productos, gestionar compras y procesar pagos mediante tarjeta de crédito usando el ecosistema de la pasarela de pagos **Wompi Colombia**.
+El proyecto consiste en una tienda virtual y sistema transaccional donde los usuarios pueden consultar catálogo de productos, gestionar compras y procesar pagos mediante tarjeta de crédito usando el ecosistema de la pasarela de pagos **Wom+*& Colombia**.
 
 ### Características Principales
 - **Catálogo Interactivo**: Filtrado por categorías, búsqueda y diseño responsivo adaptativo (grid dinámico con fallback a 1 columna en móviles de $\le 520\text{px}$).
 - **Checkout Seguro & Resiliente**: Modal con validaciones exhaustivas (Zod + React Hook Form), cálculo de cuotas e intereses, desglose de tarifas base + envío y **persistencia de estado ante refrescos accidentales** (`localStorage`).
-- **Integración Wompi Sandbox**: Generación de tokens de tarjeta, firma de integridad criptográfica (SHA-256) y procesamiento de transacciones con actualización de stock atómica.
+- **Integración Wom+*& Sandbox**: Generación de tokens de tarjeta, firma de integridad criptográfica (SHA-256) y procesamiento de transacciones con actualización de stock atómica.
 - **Historial de Transacciones**: Consulta de órdenes generadas y estado en tiempo real.
 
 ---
@@ -195,7 +195,7 @@ REDIS_PORT=6379
 # Seguridad & CORS
 CORS_ORIGIN=http://localhost:5000
 
-# Wompi Sandbox Credentials
+# Wom+*& Sandbox Credentials
 PAYMENT_PUBLIC_KEY=pub_stagtest_g2u0Hit74QbGaea9GFi054RhZtE2RUMV
 PAYMENT_PRIVATE_KEY=prv_stagtest_5tJuupGbOunPvgQfL2l686tLnbR8X32y
 PAYMENT_INTEGRITY_KEY=stagtest_integ_jhH9FmF6yB3x5V2n3a8D9f4G6h7J8k9L
@@ -291,16 +291,16 @@ El proceso de compra cumple con las directrices de seguridad y tokens de Wompi:
 [Frontend (Vite / React)]
     │ 1. Envía datos sensibles directo a Wompi
     ▼
-[Wompi API: /tokens/cards] ──> Retorna card_token (tokenizado)
+[Wom+*& API: /tokens/cards] ──> Retorna card_token (tokenizado)
     │
     │ 2. POST /api/payment/process (card_token, cuotas, customer_data)
     ▼
 [Backend (Express / Hexagonal)]
     │ 3. Valida stock y calcula total (producto + base fee + envío)
     │ 4. Genera firma criptográfica SHA-256 (referencia + monto + moneda + integrity_key)
-    │ 5. POST a Wompi /transactions
+    │ 5. POST a Wom+*& /transactions
     ▼
-[Wompi Sandbox] ──> Procesa transacción (APPROVED / DECLINED / PENDING)
+[Wom+*& Sandbox] ──> Procesa transacción (APPROVED / DECLINED / PENDING)
     │
     ▼
 [Backend] 
